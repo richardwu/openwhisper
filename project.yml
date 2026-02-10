@@ -1,0 +1,58 @@
+name: OpenWhisper
+options:
+  bundleIdPrefix: com.openwhisper
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+packages:
+  SwiftWhisper:
+    url: https://github.com/exPHAT/SwiftWhisper.git
+    branch: fast
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    from: "2.4.0"
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.8.1"
+
+targets:
+  OpenWhisper:
+    type: application
+    platform: macOS
+    sources:
+      - path: OpenWhisper
+        excludes:
+          - Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.openwhisper.OpenWhisper
+        PRODUCT_NAME: OpenWhisper
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
+        ENABLE_HARDENED_RUNTIME: true
+        CODE_SIGN_IDENTITY: "-"
+        GENERATE_INFOPLIST_FILE: true
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+    dependencies:
+      - package: SwiftWhisper
+      - package: KeyboardShortcuts
+      - package: Sparkle
+    info:
+      path: OpenWhisper/Info.plist
+      properties:
+        CFBundleIconFile: AppIcon
+        LSUIElement: false
+        NSMicrophoneUsageDescription: "OpenWhisper needs microphone access to record your voice for transcription."
+        NSHumanReadableCopyright: "Copyright © 2025 OpenWhisper. All rights reserved."
+        SUFeedURL: "https://raw.githubusercontent.com/richardwu/openwhisper/main/appcast.xml"
+        SUPublicEDKey: "TO_BE_GENERATED"
+    entitlements:
+      path: OpenWhisper/OpenWhisper.entitlements
+      properties:
+        com.apple.security.device.audio-input: true
