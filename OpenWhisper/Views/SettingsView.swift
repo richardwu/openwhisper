@@ -1,11 +1,28 @@
+import ServiceManagement
 import SwiftUI
 import KeyboardShortcuts
 
 struct SettingsView: View {
     let appState: AppState
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         Form {
+            Section("General") {
+                Toggle("Launch at Login", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { _, newValue in
+                        do {
+                            if newValue {
+                                try SMAppService.mainApp.register()
+                            } else {
+                                try SMAppService.mainApp.unregister()
+                            }
+                        } catch {
+                            launchAtLogin = SMAppService.mainApp.status == .enabled
+                        }
+                    }
+            }
+
             Section("Hotkeys") {
                 HStack {
                     Text("Toggle Recording:")

@@ -55,7 +55,8 @@ jobs:
             -archivePath "$RUNNER_TEMP/$APP_NAME.xcarchive" \
             CODE_SIGN_IDENTITY="Developer ID Application" \
             CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }}
+            DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} \
+            SPARKLE_PUBLIC_EDKEY="${{ secrets.SPARKLE_PUBLIC_KEY }}"
 
       - name: Export archive
         run: |

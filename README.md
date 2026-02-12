@@ -4,9 +4,8 @@ Local, private voice-to-text for macOS. Lives in your menu bar, transcribes with
 
 ## Features
 
-- **Fully local** — audio never leaves your machine
+- **Fully local & private** — audio never leaves your machine
 - **whisper.cpp** via [SwiftWhisper](https://github.com/exPHAT/SwiftWhisper) for fast, accurate transcription
-- **Menu bar app** — always accessible, stays out of your way
 - **Global hotkey** — start/stop recording from anywhere
 - **Auto-paste** — transcribed text is pasted into the active app automatically
 - **Transcription history** — review and copy past transcriptions
@@ -22,12 +21,20 @@ Local, private voice-to-text for macOS. Lives in your menu bar, transcribes with
 
 ```bash
 brew install xcodegen
-cd open-whisper-claude
+git clone https://github.com/richardwu/openwhisper
+cd openwhisper
 xcodegen generate
-open OpenWhisper.xcodeproj
+xcodebuild -scheme OpenWhisper -configuration Debug -derivedDataPath .build build
+open .build/Build/Products/Debug/OpenWhisper.app
 ```
 
-Build and run from Xcode (Cmd+R). The app will auto-sign for local development.
+To sign with your own Apple Development certificate (persists permissions across rebuilds):
+
+```bash
+xcodebuild -scheme OpenWhisper -configuration Debug -derivedDataPath .build build \
+  CODE_SIGN_IDENTITY="Apple Development" \
+  CODE_SIGN_STYLE=Manual
+```
 
 On first launch the app will download the Whisper model (~148 MB). You'll also need to grant:
 
@@ -41,9 +48,14 @@ On first launch the app will download the Whisper model (~148 MB). You'll also n
 3. Stop recording — transcription runs locally, then the text is pasted into the frontmost app
 4. View transcription history from the main window
 
-### Global Hotkey
+### Global Hotkeys
 
-Configure the recording hotkey in the main window's settings tab.
+| Action | Default |
+|--------|---------|
+| Start/stop recording | `Cmd+'` |
+| Cancel recording | `Escape` |
+
+Hotkeys can be customized in the main window's settings tab.
 
 ## Pre-built Binaries
 

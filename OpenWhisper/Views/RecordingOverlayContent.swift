@@ -15,6 +15,8 @@ struct RecordingOverlayContent: View {
                 transcribingView
             case .cancelled:
                 cancelledView
+            case .accessibilityRequired:
+                accessibilityRequiredView
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -46,6 +48,25 @@ struct RecordingOverlayContent: View {
                 .foregroundStyle(.white.opacity(0.8))
 
             Text("Recording Cancelled")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .environment(\.colorScheme, .dark)
+        }
+    }
+
+    private var accessibilityRequiredView: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 16))
+                .foregroundStyle(.red.opacity(0.9))
+
+            Text("Enable Accessibility in System Settings")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.white)
         }

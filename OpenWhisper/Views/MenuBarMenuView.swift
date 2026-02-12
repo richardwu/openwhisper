@@ -1,3 +1,4 @@
+import KeyboardShortcuts
 import Sparkle
 import SwiftUI
 
@@ -18,13 +19,7 @@ struct MenuBarMenuView: View {
             }
         }
 
-        Button(appState.isRecording ? "Stop Recording" : "Start Recording") {
-            Task {
-                await appState.toggleRecording()
-            }
-        }
-        .disabled(!appState.modelManager.isModelReady || appState.isTranscribing)
-        .keyboardShortcut("r")
+        recordingButton
 
         Divider()
 
@@ -35,13 +30,45 @@ struct MenuBarMenuView: View {
         Button("Show Main Window") {
             AppState.showMainWindow()
         }
-        .keyboardShortcut(",")
 
         Divider()
 
         Button("Quit OpenWhisper") {
             NSApplication.shared.terminate(nil)
         }
-        .keyboardShortcut("q")
+    }
+
+    @ViewBuilder
+    private var recordingButton: some View {
+        let button = Button(appState.isRecording ? "Stop Recording" : "Start Recording") {
+            Task {
+                await appState.toggleRecording()
+            }
+        }
+        .disabled(!appState.modelManager.isModelReady || appState.isTranscribing)
+
+        if let shortcut = KeyboardShortcuts.getShortcut(for: .toggleRecording),
+           let keyEquiv = shortcut.swiftUIKeyEquivalent {
+            button.keyboardShortcut(keyEquiv, modifiers: shortcut.swiftUIModifiers)
+        } else {
+            button
+        }
+    }
+}
+
+@MainActor
+private extension KeyboardShortcuts.Shortcut {
+    var swiftUIKeyEquivalent: KeyEquivalent? {
+        guard let str = nsMenuItemKeyEquivalent, let char = str.first else { return nil }
+        return KeyEquivalent(char)
+    }
+
+    var swiftUIModifiers: EventModifiers {
+        var mods: EventModifiers = []
+        if modifiers.contains(.command) { mods.insert(.command) }
+        if modifiers.contains(.option) { mods.insert(.option) }
+        if modifiers.contains(.shift) { mods.insert(.shift) }
+        if modifiers.contains(.control) { mods.insert(.control) }
+        return mods
     }
 }

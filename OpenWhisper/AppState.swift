@@ -81,8 +81,15 @@ final class AppState {
 
         if !Permissions.isAccessibilityGranted {
             statusMessage = "Accessibility permission required for pasting text"
+            overlayState.phase = .accessibilityRequired
+            overlayController?.show()
             Permissions.promptAccessibilityIfNeeded()
-            Self.showMainWindow()
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                guard self?.overlayState.phase == .accessibilityRequired else { return }
+                self?.overlayState.phase = .hidden
+                self?.overlayController?.dismiss()
+            }
             return
         }
 

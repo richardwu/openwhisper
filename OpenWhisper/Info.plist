@@ -26,9 +26,11 @@
 	<string>Copyright © 2025 OpenWhisper. All rights reserved.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>OpenWhisper needs microphone access to record your voice for transcription.</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
 	<key>SUFeedURL</key>
 	<string>https://raw.githubusercontent.com/richardwu/openwhisper/main/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>TO_BE_GENERATED</string>
+	<string>$(SPARKLE_PUBLIC_EDKEY)</string>
 </dict>
 </plist>

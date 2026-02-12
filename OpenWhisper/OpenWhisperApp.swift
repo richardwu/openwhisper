@@ -14,6 +14,13 @@ struct OpenWhisperApp: App {
             MainWindowView(appState: appState)
         }
         .defaultSize(width: 620, height: 500)
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates...") {
+                    updaterController.updater.checkForUpdates()
+                }
+            }
+        }
         MenuBarExtra {
             MenuBarMenuView(appState: appState, updater: updaterController.updater)
         } label: {

@@ -51,7 +51,8 @@ targets:
         NSMicrophoneUsageDescription: "OpenWhisper needs microphone access to record your voice for transcription."
         NSHumanReadableCopyright: "Copyright © 2025 OpenWhisper. All rights reserved."
         SUFeedURL: "https://raw.githubusercontent.com/richardwu/openwhisper/main/appcast.xml"
-        SUPublicEDKey: "TO_BE_GENERATED"
+        SUPublicEDKey: "$(SPARKLE_PUBLIC_EDKEY)"
+        SUEnableAutomaticChecks: true
     entitlements:
       path: OpenWhisper/OpenWhisper.entitlements
       properties:

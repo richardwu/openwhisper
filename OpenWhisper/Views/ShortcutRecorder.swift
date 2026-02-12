@@ -96,7 +96,7 @@ struct ShortcutRecorder: View {
 
     private func keyDisplayString(_ key: KeyboardShortcuts.Key) -> String {
         switch key {
-        case .escape: return "\u{238B}"
+        case .escape: return "Esc"
         case .return: return "\u{21A9}"
         case .tab: return "\u{21E5}"
         case .space: return "\u{2423}"
