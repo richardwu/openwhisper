@@ -9,10 +9,13 @@ macOS menu bar voice-to-text app using local whisper.cpp. Non-sandboxed, SwiftUI
 ```bash
 brew install xcodegen
 xcodegen generate
-xcodebuild -scheme OpenWhisper -configuration Debug -derivedDataPath .build build
+xcodebuild -scheme OpenWhisper -configuration Debug -derivedDataPath .build build \
+  CODE_SIGN_IDENTITY="Apple Development" CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=T2ZTUY8F2X
 ```
 
 The Xcode project (`*.xcodeproj`) is gitignored — always regenerate with `xcodegen generate` before building.
+
+**Always pass `CODE_SIGN_IDENTITY="Apple Development" CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=T2ZTUY8F2X`** when building debug builds. These override the ad-hoc signing in `project.yml` so that macOS preserves Microphone and Accessibility permissions across rebuilds. Without them, every rebuild invalidates granted permissions.
 
 ## Architecture
 

@@ -79,20 +79,6 @@ final class AppState {
             return
         }
 
-        if !Permissions.isAccessibilityGranted {
-            statusMessage = "Accessibility permission required for pasting text"
-            overlayState.phase = .accessibilityRequired
-            overlayController?.show()
-            Permissions.promptAccessibilityIfNeeded()
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-                guard self?.overlayState.phase == .accessibilityRequired else { return }
-                self?.overlayState.phase = .hidden
-                self?.overlayController?.dismiss()
-            }
-            return
-        }
-
         do {
             try audioRecorder.startRecording()
             isRecording = true
