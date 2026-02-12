@@ -164,28 +164,18 @@ EOF
 
 echo "    Appcast written to $BUILD_DIR/appcast.xml"
 
-# --- GitHub Release ---
-echo ""
-echo "==> Creating GitHub release $TAG..."
-git tag "$TAG"
-git push origin "$TAG"
-
-gh release create "$TAG" \
-  --title "$APP_NAME $VERSION" \
-  --generate-notes \
-  "$BUILD_DIR/$APP_NAME.dmg"
-
-echo ""
-echo "==> Updating appcast.xml in repo..."
+# --- Done ---
 cp "$BUILD_DIR/appcast.xml" "$PROJECT_DIR/appcast.xml"
-git add appcast.xml
-git commit -m "Update appcast.xml for $VERSION"
-git push origin main
 
 echo ""
-echo "=== Release $VERSION complete ==="
-echo "  DMG: $BUILD_DIR/$APP_NAME.dmg"
-echo "  GitHub: https://github.com/$REPO/releases/tag/$TAG"
+echo "=== Build $VERSION complete ==="
+echo "  DMG:     $BUILD_DIR/$APP_NAME.dmg"
+echo "  Appcast: appcast.xml (copied to repo root)"
+echo ""
+echo "Next steps:"
+echo "  git tag $TAG && git push origin $TAG"
+echo "  gh release create $TAG --title '$APP_NAME $VERSION' --generate-notes $BUILD_DIR/$APP_NAME.dmg"
+echo "  git add appcast.xml && git commit -m 'Update appcast.xml for $VERSION' && git push origin main"
 echo ""
 echo "NOTE: First time? Store notarization credentials with:"
 echo "  xcrun notarytool store-credentials notarytool"
