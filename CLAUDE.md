@@ -77,8 +77,22 @@ Key files:
 - Uses `SMAppService.mainApp` (ServiceManagement framework, macOS 13+)
 - Toggle in Settings reverts on failure
 
-## GitHub Actions
+## CI
 
 - `.github/workflows/build.yml` — CI build on push/PR to main
-- `.github/workflows/release.yml` — Full release on `v*` tags: sign, notarize, DMG, Sparkle, GitHub Release upload
-- Required secrets: `DEVELOPER_ID_P12_BASE64`, `DEVELOPER_ID_P12_PASSWORD`, `APPLE_ID`, `APPLE_APP_PASSWORD`, `APPLE_TEAM_ID`, `SPARKLE_PRIVATE_KEY`
+
+## Releasing
+
+Releases are created locally via `bin/create_release`:
+
+```bash
+bin/create_release 0.2.0
+```
+
+The script handles: xcodegen → archive → code sign (Developer ID) → notarize → DMG → Sparkle sign → appcast.xml → GitHub Release.
+
+Prerequisites:
+- `Developer ID Application` certificate in keychain
+- Sparkle EdDSA key (`generate_keys` from Sparkle SPM artifact)
+- Notarization credentials stored via `xcrun notarytool store-credentials notarytool`
+- CLI tools: `xcodegen`, `create-dmg`, `gh`

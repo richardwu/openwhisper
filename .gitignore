@@ -23,5 +23,8 @@ build/
 # Model files (too large for git)
 *.bin
 
+# Release build output
+.release/
+
 # Claude Code local settings
 .claude/settings.local.json

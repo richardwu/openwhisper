@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_NAME="OpenWhisper"
+SCHEME="OpenWhisper"
+REPO="richardwu/openwhisper"
+
+# --- Parse args ---
+if [ $# -lt 1 ]; then
+  echo "Usage: bin/create_release <VERSION>"
+  echo "  e.g. bin/create_release 0.2.0"
+  exit 1
+fi
+
+VERSION="$1"
+TAG="v${VERSION}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+BUILD_DIR="$PROJECT_DIR/.release"
+
+cd "$PROJECT_DIR"
+
+# --- Validate environment ---
+echo "==> Checking prerequisites..."
+
+command -v xcodegen >/dev/null || { echo "Error: xcodegen not found (brew install xcodegen)"; exit 1; }
+command -v create-dmg >/dev/null || { echo "Error: create-dmg not found (brew install create-dmg)"; exit 1; }
+command -v gh >/dev/null || { echo "Error: gh not found (brew install gh)"; exit 1; }
+command -v xcrun >/dev/null || { echo "Error: xcrun not found (install Xcode)"; exit 1; }
+
+# Check for Developer ID cert
+if ! security find-identity -v -p codesigning | grep -q "Developer ID Application"; then
+  echo "Error: No 'Developer ID Application' certificate found in keychain."
+  echo "Create one in Xcode → Settings → Accounts → Manage Certificates."
+  exit 1
+fi
+
+TEAM_ID=$(security find-certificate -c "Developer ID Application" -p | openssl x509 -noout -subject 2>/dev/null | sed -n 's/.*OU=\([^,]*\).*/\1/p')
+echo "    Team ID: $TEAM_ID"
+echo "    Version: $VERSION (tag: $TAG)"
+
+# Check for Sparkle public key
+SPARKLE_PUBLIC_KEY=$(.build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys -p 2>/dev/null || true)
+if [ -z "$SPARKLE_PUBLIC_KEY" ]; then
+  echo "Error: No Sparkle EdDSA key found. Run: .build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys"
+  exit 1
+fi
+echo "    Sparkle public key: ${SPARKLE_PUBLIC_KEY:0:20}..."
+
+# --- Clean and build ---
+echo ""
+echo "==> Generating Xcode project..."
+xcodegen generate
+
+echo "==> Archiving Release build..."
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR"
+
+xcodebuild archive \
+  -scheme "$SCHEME" \
+  -configuration Release \
+  -archivePath "$BUILD_DIR/$APP_NAME.xcarchive" \
+  CODE_SIGN_IDENTITY="Developer ID Application" \
+  CODE_SIGN_STYLE=Manual \
+  DEVELOPMENT_TEAM="$TEAM_ID" \
+  SPARKLE_PUBLIC_EDKEY="$SPARKLE_PUBLIC_KEY" \
+  MARKETING_VERSION="$VERSION" \
+  | tail -5
+
+# --- Export ---
+echo "==> Exporting archive..."
+cat > "$BUILD_DIR/ExportOptions.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>method</key>
+  <string>developer-id</string>
+  <key>teamID</key>
+  <string>$TEAM_ID</string>
+</dict>
+</plist>
+EOF
+
+xcodebuild -exportArchive \
+  -archivePath "$BUILD_DIR/$APP_NAME.xcarchive" \
+  -exportOptionsPlist "$BUILD_DIR/ExportOptions.plist" \
+  -exportPath "$BUILD_DIR/export" \
+  | tail -3
+
+APP_PATH="$BUILD_DIR/export/$APP_NAME.app"
+
+# --- Notarize ---
+echo "==> Notarizing..."
+echo "    (You may be prompted for Apple ID credentials on first run."
+echo "     Store them with: xcrun notarytool store-credentials)"
+
+ditto -c -k --keepParent "$APP_PATH" "$BUILD_DIR/$APP_NAME-notarize.zip"
+
+xcrun notarytool submit "$BUILD_DIR/$APP_NAME-notarize.zip" \
+  --keychain-profile "notarytool" \
+  --wait
+
+echo "==> Stapling notarization ticket..."
+xcrun stapler staple "$APP_PATH"
+
+# --- DMG ---
+echo "==> Creating DMG..."
+create-dmg \
+  --volname "$APP_NAME" \
+  --window-pos 200 120 \
+  --window-size 600 400 \
+  --icon-size 100 \
+  --icon "$APP_NAME.app" 150 190 \
+  --app-drop-link 450 190 \
+  "$BUILD_DIR/$APP_NAME.dmg" \
+  "$APP_PATH" \
+  || true  # create-dmg exits 2 on success when no background image is set
+
+if [ ! -f "$BUILD_DIR/$APP_NAME.dmg" ]; then
+  echo "Error: DMG creation failed"
+  exit 1
+fi
+
+# --- Sparkle sign ---
+echo "==> Signing DMG with Sparkle..."
+SIGN_UPDATE=$(find .build -path "*/artifacts/sparkle/Sparkle/bin/sign_update" -type f 2>/dev/null | head -1)
+if [ -z "$SIGN_UPDATE" ]; then
+  echo "Error: sign_update not found. Run xcodebuild -resolvePackageDependencies first."
+  exit 1
+fi
+
+SPARKLE_SIG=$("$SIGN_UPDATE" "$BUILD_DIR/$APP_NAME.dmg" 2>&1)
+echo "    $SPARKLE_SIG"
+
+ED_SIGNATURE=$(echo "$SPARKLE_SIG" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')
+DMG_SIZE=$(stat -f%z "$BUILD_DIR/$APP_NAME.dmg")
+
+# --- Appcast ---
+echo "==> Generating appcast.xml..."
+BUILD_NUMBER=$(grep 'CURRENT_PROJECT_VERSION' project.yml | head -1 | sed 's/.*: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/')
+DATE=$(date -R)
+
+cat > "$BUILD_DIR/appcast.xml" <<EOF
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>$APP_NAME</title>
+    <item>
+      <title>Version $VERSION</title>
+      <pubDate>$DATE</pubDate>
+      <sparkle:version>$BUILD_NUMBER</sparkle:version>
+      <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
+      <enclosure
+        url="https://github.com/$REPO/releases/download/$TAG/$APP_NAME.dmg"
+        length="$DMG_SIZE"
+        type="application/octet-stream"
+        sparkle:edSignature="$ED_SIGNATURE"
+      />
+    </item>
+  </channel>
+</rss>
+EOF
+
+echo "    Appcast written to $BUILD_DIR/appcast.xml"
+
+# --- GitHub Release ---
+echo ""
+echo "==> Creating GitHub release $TAG..."
+git tag "$TAG"
+git push origin "$TAG"
+
+gh release create "$TAG" \
+  --title "$APP_NAME $VERSION" \
+  --generate-notes \
+  "$BUILD_DIR/$APP_NAME.dmg"
+
+echo ""
+echo "==> Updating appcast.xml in repo..."
+cp "$BUILD_DIR/appcast.xml" "$PROJECT_DIR/appcast.xml"
+git add appcast.xml
+git commit -m "Update appcast.xml for $VERSION"
+git push origin main
+
+echo ""
+echo "=== Release $VERSION complete ==="
+echo "  DMG: $BUILD_DIR/$APP_NAME.dmg"
+echo "  GitHub: https://github.com/$REPO/releases/tag/$TAG"
+echo ""
+echo "NOTE: First time? Store notarization credentials with:"
+echo "  xcrun notarytool store-credentials notarytool"
