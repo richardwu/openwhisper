@@ -1,5 +1,7 @@
 # OpenWhisper
 
+<video src="https://github.com/user-attachments/assets/08c6ce6b-b813-449b-a337-b9d91352c2a9" width="100%" autoplay loop muted playsinline></video>
+
 Local, private voice-to-text for macOS. Lives in your menu bar, transcribes with [whisper.cpp](https://github.com/ggerganov/whisper.cpp), and pastes the result directly into any app.
 
 ## Install
