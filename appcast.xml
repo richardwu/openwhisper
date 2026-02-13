@@ -4,14 +4,14 @@
     <title>OpenWhisper</title>
     <item>
       <title>Version 0.1.0</title>
-      <pubDate>Thu, 12 Feb 2026 10:52:57 -0500</pubDate>
+      <pubDate>Fri, 13 Feb 2026 10:59:23 -0500</pubDate>
       <sparkle:version>1</sparkle:version>
       <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
       <enclosure
         url="https://github.com/richardwu/openwhisper/releases/download/v0.1.0/OpenWhisper.dmg"
-        length="2017082"
+        length="135799992"
         type="application/octet-stream"
-        sparkle:edSignature="h/Ebcrqg6Zg7FtG7QCYFjuguq5ABH4sfcnDelWO5eJbMFNo19tSykhjfP+ME6z1FePgTff0QGfMH+jyeGMoxDQ=="
+        sparkle:edSignature="RWBVcdXUgFYIU9F38WYabS4D51IFzo9VnASTMWkMbs5rH6Z71ADTG8iGyht947QLPjkbUN1WML5YVFq7/vW8AA=="
       />
     </item>
   </channel>
