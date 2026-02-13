@@ -19,4 +19,6 @@ jobs:
         run: xcodegen generate
 
       - name: Build
+        env:
+          SKIP_MODEL_DOWNLOAD: "1"
         run: xcodebuild -scheme OpenWhisper -configuration Debug -derivedDataPath .build build

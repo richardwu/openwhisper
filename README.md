@@ -2,6 +2,10 @@
 
 Local, private voice-to-text for macOS. Lives in your menu bar, transcribes with [whisper.cpp](https://github.com/ggerganov/whisper.cpp), and pastes the result directly into any app.
 
+## Install
+
+Download the latest `.dmg` from the [Releases](https://github.com/richardwu/openwhisper/releases) page — open it, drag OpenWhisper to Applications, and you're done.
+
 ## Features
 
 - **Fully local & private** — audio never leaves your machine
@@ -36,7 +40,7 @@ xcodebuild -scheme OpenWhisper -configuration Debug -derivedDataPath .build buil
   CODE_SIGN_STYLE=Manual
 ```
 
-On first launch the app will download the Whisper model (~148 MB). You'll also need to grant:
+On first launch of a dev build the app will download the Whisper model (~148 MB) if not already bundled. You'll also need to grant:
 
 - **Microphone** access (prompted automatically)
 - **Accessibility** access (System Settings > Privacy & Security > Accessibility) for auto-paste
@@ -59,7 +63,7 @@ Hotkeys can be customized in the main window's settings tab.
 
 ## Pre-built Binaries
 
-Signed and notarized `.dmg` releases are published on the [Releases](https://github.com/richardwu/openwhisper/releases) page. These require no Xcode or developer tools — just download, open, and drag to Applications.
+Signed and notarized `.dmg` releases are published on the [Releases](https://github.com/richardwu/openwhisper/releases) page. These bundle the Whisper model and require no Xcode or developer tools — just download, open, and drag to Applications.
 
 Building pre-built binaries requires an Apple Developer ID Application certificate ($99/year Apple Developer Program).
 

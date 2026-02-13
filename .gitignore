@@ -22,6 +22,7 @@ build/
 
 # Model files (too large for git)
 *.bin
+OpenWhisper/Resources/Models/
 
 # Release build output
 .release/

@@ -26,6 +26,10 @@ targets:
       - path: OpenWhisper
         excludes:
           - Info.plist
+          - Resources/Models
+      - path: OpenWhisper/Resources/Models
+        optional: true
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.openwhisper.OpenWhisper

@@ -1,4 +1,5 @@
 import SwiftUI
+import KeyboardShortcuts
 
 enum AppTab: String, CaseIterable {
     case home = "Home"
@@ -168,6 +169,16 @@ struct MainWindowView: View {
                 }
                 .padding(.horizontal, 24)
                 .padding(.vertical, 16)
+
+                // Hotkey reference
+                Divider()
+
+                HStack(spacing: 24) {
+                    hotkeyLabel("Start/stop", for: .toggleRecording)
+                    hotkeyLabel("Cancel recording", for: .cancelRecording)
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
             }
         }
     }
@@ -200,6 +211,23 @@ struct MainWindowView: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func hotkeyLabel(_ label: String, for name: KeyboardShortcuts.Name) -> some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            let shortcutText = KeyboardShortcuts.getShortcut(for: name)?.displayString
+                ?? name.defaultShortcut?.displayString
+                ?? "Not set"
+            Text(shortcutText)
+                .font(.caption.monospaced())
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+        }
     }
 
     private func instructionRow(step: Int, title: String, detail: String) -> some View {

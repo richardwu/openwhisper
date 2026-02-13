@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MODEL_URL="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"
+DEST="$(cd "$(dirname "$0")/.." && pwd)/OpenWhisper/Resources/Models/ggml-base.en.bin"
+
+if [ "${SKIP_MODEL_DOWNLOAD:-}" = "1" ]; then exit 0; fi
+if [ -f "$DEST" ]; then echo "Model exists, skipping."; exit 0; fi
+
+mkdir -p "$(dirname "$DEST")"
+echo "Downloading whisper model to $DEST..."
+curl -L --progress-bar -o "$DEST" "$MODEL_URL"

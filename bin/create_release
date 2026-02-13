@@ -17,6 +17,7 @@ TAG="v${VERSION}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="$PROJECT_DIR/.release"
+RELEASES_DIR="$HOME/.openwhisper-releases"
 
 cd "$PROJECT_DIR"
 
@@ -46,6 +47,11 @@ if [ -z "$SPARKLE_PUBLIC_KEY" ]; then
   exit 1
 fi
 echo "    Sparkle public key: ${SPARKLE_PUBLIC_KEY:0:20}..."
+
+# --- Ensure model is available ---
+echo ""
+echo "==> Ensuring whisper model is available..."
+"$PROJECT_DIR/bin/download_model"
 
 # --- Clean and build ---
 echo ""
@@ -136,10 +142,75 @@ echo "    $SPARKLE_SIG"
 ED_SIGNATURE=$(echo "$SPARKLE_SIG" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')
 DMG_SIZE=$(stat -f%z "$BUILD_DIR/$APP_NAME.dmg")
 
+# --- Delta updates ---
+echo "==> Generating delta updates..."
+BUILD_NUMBER=$(grep 'CURRENT_PROJECT_VERSION' project.yml | head -1 | sed 's/.*: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/')
+
+BINARY_DELTA=$(find .build -path "*/artifacts/sparkle/Sparkle/bin/BinaryDelta" -type f 2>/dev/null | head -1)
+DELTA_FILES=()
+DELTA_XML=""
+
+if [ -z "$BINARY_DELTA" ]; then
+  echo "    Warning: BinaryDelta not found, skipping delta generation."
+elif [ ! -d "$RELEASES_DIR" ]; then
+  echo "    No previous releases found in $RELEASES_DIR, skipping deltas."
+else
+  for OLD_APP_DIR in "$RELEASES_DIR"/v*/; do
+    [ -d "$OLD_APP_DIR" ] || continue
+    OLD_APP="$OLD_APP_DIR/$APP_NAME.app"
+    [ -d "$OLD_APP" ] || continue
+
+    OLD_VERSION=$(basename "$OLD_APP_DIR")  # e.g. v0.1.0
+    OLD_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$OLD_APP/Contents/Info.plist" 2>/dev/null || true)
+
+    if [ -z "$OLD_BUILD" ]; then
+      echo "    Skipping $OLD_VERSION: could not read build number"
+      continue
+    fi
+
+    if [ "$OLD_BUILD" = "$BUILD_NUMBER" ]; then
+      echo "    Skipping $OLD_VERSION: same build number ($OLD_BUILD)"
+      continue
+    fi
+
+    DELTA_FILENAME="$APP_NAME-${OLD_BUILD}-to-${BUILD_NUMBER}.delta"
+    DELTA_PATH="$BUILD_DIR/$DELTA_FILENAME"
+
+    echo "    Creating delta: $OLD_VERSION (build $OLD_BUILD) → $VERSION (build $BUILD_NUMBER)..."
+    "$BINARY_DELTA" create "$OLD_APP" "$APP_PATH" "$DELTA_PATH"
+
+    DELTA_SIG_OUTPUT=$("$SIGN_UPDATE" "$DELTA_PATH" 2>&1)
+    DELTA_ED_SIG=$(echo "$DELTA_SIG_OUTPUT" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')
+    DELTA_SIZE=$(stat -f%z "$DELTA_PATH")
+
+    echo "    Delta: $DELTA_FILENAME ($DELTA_SIZE bytes)"
+
+    DELTA_FILES+=("$DELTA_PATH")
+    DELTA_XML+="
+        <enclosure
+          url=\"https://github.com/$REPO/releases/download/$TAG/$DELTA_FILENAME\"
+          sparkle:deltaFrom=\"$OLD_BUILD\"
+          length=\"$DELTA_SIZE\"
+          type=\"application/octet-stream\"
+          sparkle:edSignature=\"$DELTA_ED_SIG\"
+        />"
+  done
+fi
+
+if [ ${#DELTA_FILES[@]} -eq 0 ]; then
+  echo "    No deltas generated."
+fi
+
 # --- Appcast ---
 echo "==> Generating appcast.xml..."
-BUILD_NUMBER=$(grep 'CURRENT_PROJECT_VERSION' project.yml | head -1 | sed 's/.*: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/')
 DATE=$(date -R)
+
+DELTAS_SECTION=""
+if [ -n "$DELTA_XML" ]; then
+  DELTAS_SECTION="
+      <sparkle:deltas>$DELTA_XML
+      </sparkle:deltas>"
+fi
 
 cat > "$BUILD_DIR/appcast.xml" <<EOF
 <?xml version="1.0" encoding="utf-8"?>
@@ -156,7 +227,7 @@ cat > "$BUILD_DIR/appcast.xml" <<EOF
         length="$DMG_SIZE"
         type="application/octet-stream"
         sparkle:edSignature="$ED_SIGNATURE"
-      />
+      />${DELTAS_SECTION}
     </item>
   </channel>
 </rss>
@@ -164,17 +235,33 @@ EOF
 
 echo "    Appcast written to $BUILD_DIR/appcast.xml"
 
+# --- Archive .app for future deltas ---
+echo "==> Archiving .app for future delta generation..."
+mkdir -p "$RELEASES_DIR/$TAG"
+cp -R "$APP_PATH" "$RELEASES_DIR/$TAG/$APP_NAME.app"
+echo "    Stored at $RELEASES_DIR/$TAG/$APP_NAME.app"
+
 # --- Done ---
 cp "$BUILD_DIR/appcast.xml" "$PROJECT_DIR/appcast.xml"
+
+UPLOAD_FILES="$BUILD_DIR/$APP_NAME.dmg"
+if [ ${#DELTA_FILES[@]} -gt 0 ]; then
+  for df in "${DELTA_FILES[@]}"; do
+    UPLOAD_FILES+=" $df"
+  done
+fi
 
 echo ""
 echo "=== Build $VERSION complete ==="
 echo "  DMG:     $BUILD_DIR/$APP_NAME.dmg"
+if [ ${#DELTA_FILES[@]} -gt 0 ]; then
+  echo "  Deltas:  ${#DELTA_FILES[@]} delta file(s) in $BUILD_DIR/"
+fi
 echo "  Appcast: appcast.xml (copied to repo root)"
 echo ""
 echo "Next steps:"
 echo "  git tag $TAG && git push origin $TAG"
-echo "  gh release create $TAG --title '$APP_NAME $VERSION' --generate-notes $BUILD_DIR/$APP_NAME.dmg"
+echo "  gh release create $TAG --title '$APP_NAME $VERSION' --generate-notes $UPLOAD_FILES"
 echo "  git add appcast.xml && git commit -m 'Update appcast.xml for $VERSION' && git push origin main"
 echo ""
 echo "NOTE: First time? Store notarization credentials with:"

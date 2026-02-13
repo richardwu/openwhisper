@@ -80,22 +80,30 @@ struct ShortcutRecorder: View {
     }
 
     private func shortcutDisplayString(_ shortcut: KeyboardShortcuts.Shortcut) -> String {
+        shortcut.displayString
+    }
+}
+
+extension KeyboardShortcuts.Shortcut {
+    var displayString: String {
         var parts: [String] = []
-        let mods = shortcut.modifiers
+        let mods = modifiers
         if mods.contains(.control) { parts.append("\u{2303}") }
         if mods.contains(.option) { parts.append("\u{2325}") }
         if mods.contains(.shift) { parts.append("\u{21E7}") }
         if mods.contains(.command) { parts.append("\u{2318}") }
 
-        if let key = shortcut.key {
-            parts.append(keyDisplayString(key))
+        if let key = key {
+            parts.append(key.displayString)
         }
 
         return parts.joined()
     }
+}
 
-    private func keyDisplayString(_ key: KeyboardShortcuts.Key) -> String {
-        switch key {
+extension KeyboardShortcuts.Key {
+    var displayString: String {
+        switch self {
         case .escape: return "Esc"
         case .return: return "\u{21A9}"
         case .tab: return "\u{21E5}"
@@ -111,11 +119,11 @@ struct ShortcutRecorder: View {
         case .pageUp: return "\u{21DE}"
         case .pageDown: return "\u{21DF}"
         default:
-            let keyCode = UInt16(key.rawValue)
+            let keyCode = UInt16(rawValue)
             let source = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
             let layoutDataRef = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData)
             guard let layoutDataRef else {
-                return "Key(\(key.rawValue))"
+                return "Key(\(rawValue))"
             }
             let layoutData = unsafeBitCast(layoutDataRef, to: CFData.self)
             let keyLayoutPtr = unsafeBitCast(CFDataGetBytePtr(layoutData), to: UnsafePointer<UCKeyboardLayout>.self)
@@ -137,7 +145,7 @@ struct ShortcutRecorder: View {
             if status == noErr, length > 0 {
                 return String(utf16CodeUnits: chars, count: length).uppercased()
             }
-            return "Key(\(key.rawValue))"
+            return "Key(\(rawValue))"
         }
     }
 }
