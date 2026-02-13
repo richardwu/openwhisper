@@ -31,6 +31,6 @@
 	<key>SUFeedURL</key>
 	<string>https://raw.githubusercontent.com/richardwu/openwhisper/main/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>$(SPARKLE_PUBLIC_EDKEY)</string>
+	<string>CUC/EvtFODphrKHiu20NsqOscAsLuQmyDmlK13BZVnY=</string>
 </dict>
 </plist>

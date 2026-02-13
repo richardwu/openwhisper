@@ -34,8 +34,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.openwhisper.OpenWhisper
         PRODUCT_NAME: OpenWhisper
-        MARKETING_VERSION: "0.1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "0.2.0"
+        CURRENT_PROJECT_VERSION: "2"
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
@@ -55,7 +55,7 @@ targets:
         NSMicrophoneUsageDescription: "OpenWhisper needs microphone access to record your voice for transcription."
         NSHumanReadableCopyright: "Copyright © 2025 OpenWhisper. All rights reserved."
         SUFeedURL: "https://raw.githubusercontent.com/richardwu/openwhisper/main/appcast.xml"
-        SUPublicEDKey: "$(SPARKLE_PUBLIC_EDKEY)"
+        SUPublicEDKey: "CUC/EvtFODphrKHiu20NsqOscAsLuQmyDmlK13BZVnY="
         SUEnableAutomaticChecks: true
     entitlements:
       path: OpenWhisper/OpenWhisper.entitlements

@@ -5,6 +5,7 @@ struct HistoryView: View {
     @State private var entryToDelete: TranscriptionEntry?
     @State private var showDeleteAllConfirmation = false
     @State private var copiedEntryID: UUID?
+    @State private var now = Date()
 
     var body: some View {
         if historyStore.entries.isEmpty {
@@ -41,7 +42,7 @@ struct HistoryView: View {
                                 .textSelection(.enabled)
 
                             HStack {
-                                Text(entry.date, style: .relative)
+                                Text(relativeTime(from: entry.date))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
 
@@ -95,6 +96,7 @@ struct HistoryView: View {
             } message: {
                 Text("This will permanently delete all \(historyStore.entries.count) transcriptions.")
             }
+            .onAppear { startTimer() }
             .alert("Delete Transcription?",
                    isPresented: Binding(
                     get: { entryToDelete != nil },
@@ -116,6 +118,32 @@ struct HistoryView: View {
                 }
             }
         }
+    }
+
+    private func startTimer() {
+        Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
+            Task { @MainActor in now = Date() }
+        }
+    }
+
+    private func relativeTime(from date: Date) -> String {
+        let seconds = now.timeIntervalSince(date)
+        if seconds < 60 {
+            return "just now"
+        }
+        let minutes = Int(seconds / 60)
+        if minutes < 60 {
+            return minutes == 1 ? "1 min ago" : "\(minutes) min ago"
+        }
+        let hours = Int(seconds / 3600)
+        if hours < 24 {
+            return hours == 1 ? "1 hr ago" : "\(hours) hrs ago"
+        }
+        let days = Int(seconds / 86400)
+        if days == 1 {
+            return "yesterday"
+        }
+        return "\(days) days ago"
     }
 
     private func copyEntry(_ entry: TranscriptionEntry) {

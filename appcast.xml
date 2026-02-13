@@ -3,16 +3,25 @@
   <channel>
     <title>OpenWhisper</title>
     <item>
-      <title>Version 0.1.0</title>
-      <pubDate>Fri, 13 Feb 2026 12:22:05 -0500</pubDate>
-      <sparkle:version>1</sparkle:version>
-      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <title>Version 0.2.0</title>
+      <pubDate>Fri, 13 Feb 2026 14:13:11 -0500</pubDate>
+      <sparkle:version>2</sparkle:version>
+      <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
       <enclosure
-        url="https://github.com/richardwu/openwhisper/releases/download/v0.1.0/OpenWhisper.dmg"
-        length="135799995"
+        url="https://github.com/richardwu/openwhisper/releases/download/v0.2.0/OpenWhisper.dmg"
+        length="135802406"
         type="application/octet-stream"
-        sparkle:edSignature="szG63jOwGDv5RD/ADJEQfq94743bJqwP10NU355smr0EJf1LtmPzB/o0Z9TBqKN27ldu5GCT3ulJw6yHKluyAg=="
+        sparkle:edSignature="XUQEwknUINfudG7ZgOSreIEKvl9FtQu0Prwd9H4EZrAeaOpxpHDS4O0Dt+ue0DjvVtZQU8jnowy0WyzAiPwgAg=="
       />
+      <sparkle:deltas>
+        <enclosure
+          url="https://github.com/richardwu/openwhisper/releases/download/v0.2.0/OpenWhisper-1-to-2.delta"
+          sparkle:deltaFrom="1"
+          length="103930"
+          type="application/octet-stream"
+          sparkle:edSignature="gOoYKmsmAoCp1Onwmbr3M7hiD2ucyOUKtfOhxFyS0obRDsMbODC7+BJqi5xdk0iGQRFfqeNkqhsukNyY0L6DDA=="
+        />
+      </sparkle:deltas>
     </item>
   </channel>
 </rss>
