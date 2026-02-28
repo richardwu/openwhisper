@@ -8,6 +8,9 @@ final class AppState {
     var statusMessage = "Ready"
     var isTranscribing = false
 
+    @ObservationIgnored
+    @AppStorage("systemPrompt") var systemPrompt: String = ""
+
     let audioRecorder = AudioRecorder()
     let transcriptionService = TranscriptionService()
     let pasteService = PasteService()
@@ -68,7 +71,17 @@ final class AppState {
 
     private func startRecording() {
         guard modelManager.isModelReady else {
-            statusMessage = "Model not downloaded yet"
+            if modelManager.isDownloading {
+                overlayState.phase = .modelDownloading
+                overlayController?.show()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                    guard self?.overlayState.phase == .modelDownloading else { return }
+                    self?.overlayState.phase = .hidden
+                    self?.overlayController?.dismiss()
+                }
+            } else {
+                statusMessage = "Model not downloaded yet"
+            }
             return
         }
 
@@ -130,9 +143,11 @@ final class AppState {
         overlayState.phase = .transcribing
 
         do {
+            let prompt = systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
             let text = try await transcriptionService.transcribe(
                 audioFrames: samples,
-                modelURL: modelURL
+                modelURL: modelURL,
+                initialPrompt: prompt.isEmpty ? nil : prompt
             )
 
             if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

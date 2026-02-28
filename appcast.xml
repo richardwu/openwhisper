@@ -13,15 +13,6 @@
         type="application/octet-stream"
         sparkle:edSignature="XUQEwknUINfudG7ZgOSreIEKvl9FtQu0Prwd9H4EZrAeaOpxpHDS4O0Dt+ue0DjvVtZQU8jnowy0WyzAiPwgAg=="
       />
-      <sparkle:deltas>
-        <enclosure
-          url="https://github.com/richardwu/openwhisper/releases/download/v0.2.0/OpenWhisper-1-to-2.delta"
-          sparkle:deltaFrom="1"
-          length="103930"
-          type="application/octet-stream"
-          sparkle:edSignature="gOoYKmsmAoCp1Onwmbr3M7hiD2ucyOUKtfOhxFyS0obRDsMbODC7+BJqi5xdk0iGQRFfqeNkqhsukNyY0L6DDA=="
-        />
-      </sparkle:deltas>
     </item>
   </channel>
 </rss>

@@ -15,6 +15,8 @@ struct RecordingOverlayContent: View {
                 transcribingView
             case .cancelled:
                 cancelledView
+            case .modelDownloading:
+                modelDownloadingView
             case .accessibilityRequired:
                 accessibilityRequiredView
             }
@@ -48,6 +50,25 @@ struct RecordingOverlayContent: View {
                 .foregroundStyle(.white.opacity(0.8))
 
             Text("Recording Cancelled")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .environment(\.colorScheme, .dark)
+        }
+    }
+
+    private var modelDownloadingView: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+                .controlSize(.small)
+                .tint(.white)
+
+            Text("Model is downloading... give it a sec!")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.white)
         }

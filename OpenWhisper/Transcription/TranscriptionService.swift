@@ -5,12 +5,35 @@ import SwiftWhisper
 final class TranscriptionService {
     private var whisperInstance: Whisper?
     private var loadedModelURL: URL?
+    private var promptPointer: UnsafeMutablePointer<CChar>?
 
-    func transcribe(audioFrames: [Float], modelURL: URL) async throws -> String {
+    deinit {
+        if let promptPointer {
+            free(promptPointer)
+        }
+    }
+
+    func transcribe(audioFrames: [Float], modelURL: URL, initialPrompt: String? = nil) async throws -> String {
         let whisper = try getOrCreateWhisper(modelURL: modelURL)
+        updateInitialPrompt(initialPrompt, on: whisper.params)
         let segments = try await whisper.transcribe(audioFrames: audioFrames)
         let rawText = segments.map(\.text).joined()
         return filterTranscription(rawText)
+    }
+
+    private func updateInitialPrompt(_ prompt: String?, on params: WhisperParams) {
+        if let promptPointer {
+            free(promptPointer)
+            self.promptPointer = nil
+        }
+
+        if let prompt, !prompt.isEmpty {
+            let pointer = strdup(prompt)
+            self.promptPointer = pointer
+            params.initial_prompt = UnsafePointer(pointer)
+        } else {
+            params.initial_prompt = nil
+        }
     }
 
     private func filterTranscription(_ text: String) -> String {
