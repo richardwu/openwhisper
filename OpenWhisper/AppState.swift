@@ -143,11 +143,11 @@ final class AppState {
         overlayState.phase = .transcribing
 
         do {
-            let prompt = systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            // TODO: Re-enable system prompt once prompt quality is improved
+            // let prompt = systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
             let text = try await transcriptionService.transcribe(
                 audioFrames: samples,
-                modelURL: modelURL,
-                initialPrompt: prompt.isEmpty ? nil : prompt
+                modelURL: modelURL
             )
 
             if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
