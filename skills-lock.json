@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "fix-pr": {
+      "source": "richardwu/agent-skills",
+      "sourceType": "github",
+      "computedHash": "9ee990472ede436826852f65a5f737a3da1410584986de44dce71d55f0cc2926"
+    }
+  }
+}
