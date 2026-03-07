@@ -61,16 +61,12 @@ struct SettingsTabView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Button("Retry Download") {
-                            Task {
-                                await appState.modelManager.downloadModel()
-                            }
+                            appState.modelManager.startDownload()
                         }
                     }
                 } else {
                     Button("Download Model") {
-                        Task {
-                            await appState.modelManager.downloadModel()
-                        }
+                        appState.modelManager.startDownload()
                     }
                 }
             }

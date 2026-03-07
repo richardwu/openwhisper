@@ -87,6 +87,18 @@ final class ModelManager {
             downloadTask = Task {
                 await downloadModel()
             }
+        } else {
+            isDownloading = false
+            downloadProgress = 1.0
+        }
+    }
+
+    func startDownload() {
+        downloadTask?.cancel()
+        downloadTask = nil
+        downloadGeneration &+= 1
+        downloadTask = Task {
+            await downloadModel()
         }
     }
 
@@ -124,7 +136,7 @@ final class ModelManager {
                 }
             }
 
-            let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+            let session = URLSession(configuration: config, delegate: delegate, delegateQueue: OperationQueue.main)
             defer { session.invalidateAndCancel() }
 
             let (tempURL, response) = try await withTaskCancellationHandler {
@@ -184,7 +196,12 @@ private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
         let tempFile = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".bin")
         do {
             try FileManager.default.copyItem(at: location, to: tempFile)
-            continuation?.resume(returning: (tempFile, downloadTask.response!))
+            guard let response = downloadTask.response else {
+                continuation?.resume(throwing: URLError(.badServerResponse))
+                continuation = nil
+                return
+            }
+            continuation?.resume(returning: (tempFile, response))
         } catch {
             continuation?.resume(throwing: error)
         }
