@@ -34,6 +34,9 @@ final class ModelManager {
     var downloadProgress: Double = 0
     var errorMessage: String?
 
+    private var downloadTask: Task<Void, Never>?
+    private var downloadGeneration: Int = 0
+
     var selectedModel: WhisperModel {
         didSet {
             UserDefaults.standard.set(selectedModel.rawValue, forKey: "selectedModel")
@@ -76,9 +79,12 @@ final class ModelManager {
     }
 
     func selectModel(_ model: WhisperModel) {
+        downloadTask?.cancel()
+        downloadTask = nil
+        downloadGeneration &+= 1
         selectedModel = model
         if !isModelReady {
-            Task {
+            downloadTask = Task {
                 await downloadModel()
             }
         }
@@ -104,20 +110,28 @@ final class ModelManager {
         errorMessage = nil
 
         do {
+            try Task.checkCancellation()
+
             let config = URLSessionConfiguration.default
             config.timeoutIntervalForRequest = 300    // 5 min per chunk
             config.timeoutIntervalForResource = 3600  // 1 hour total
 
+            let generation = self.downloadGeneration
             let delegate = DownloadDelegate { [weak self] progress in
                 Task { @MainActor in
-                    self?.downloadProgress = progress
+                    guard let self, self.downloadGeneration == generation else { return }
+                    self.downloadProgress = progress
                 }
             }
 
             let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
             defer { session.invalidateAndCancel() }
 
-            let (tempURL, response) = try await delegate.download(session: session, from: selectedModel.downloadURL)
+            let (tempURL, response) = try await withTaskCancellationHandler {
+                try await delegate.download(session: session, from: selectedModel.downloadURL)
+            } onCancel: {
+                session.invalidateAndCancel()
+            }
 
             guard let httpResponse = response as? HTTPURLResponse,
                   (200...299).contains(httpResponse.statusCode) else {
@@ -131,6 +145,10 @@ final class ModelManager {
 
             isDownloading = false
             downloadProgress = 1.0
+        } catch is CancellationError {
+            // Don't reset isDownloading — the replacement download will take over
+        } catch let error as URLError where error.code == .cancelled {
+            // Don't reset isDownloading — the replacement download will take over
         } catch {
             isDownloading = false
             errorMessage = "Download failed: \(error.localizedDescription)"
