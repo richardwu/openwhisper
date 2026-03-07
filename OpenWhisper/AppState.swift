@@ -41,9 +41,7 @@ final class AppState {
         KeyboardShortcuts.disable(.cancelRecording)
 
         // Auto-download model on first launch
-        Task {
-            await modelManager.ensureModelAvailable()
-        }
+        modelManager.ensureModelAvailable()
     }
 
     func toggleRecording() async {

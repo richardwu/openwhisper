@@ -72,9 +72,9 @@ final class ModelManager {
         self.selectedModel = WhisperModel(rawValue: stored) ?? .small
     }
 
-    func ensureModelAvailable() async {
+    func ensureModelAvailable() {
         if !isModelReady {
-            await downloadModel()
+            startDownload()
         }
     }
 
@@ -121,14 +121,14 @@ final class ModelManager {
         downloadProgress = 0
         errorMessage = nil
 
+        let generation = self.downloadGeneration
+
         do {
             try Task.checkCancellation()
 
             let config = URLSessionConfiguration.default
             config.timeoutIntervalForRequest = 300    // 5 min per chunk
             config.timeoutIntervalForResource = 3600  // 1 hour total
-
-            let generation = self.downloadGeneration
             let delegate = DownloadDelegate { [weak self] progress in
                 Task { @MainActor in
                     guard let self, self.downloadGeneration == generation else { return }
@@ -155,6 +155,7 @@ final class ModelManager {
             }
             try FileManager.default.moveItem(at: tempURL, to: destinationURL)
 
+            guard self.downloadGeneration == generation else { return }
             isDownloading = false
             downloadProgress = 1.0
         } catch is CancellationError {
@@ -162,6 +163,7 @@ final class ModelManager {
         } catch let error as URLError where error.code == .cancelled {
             // Don't reset isDownloading — the replacement download will take over
         } catch {
+            guard self.downloadGeneration == generation else { return }
             isDownloading = false
             errorMessage = "Download failed: \(error.localizedDescription)"
         }
