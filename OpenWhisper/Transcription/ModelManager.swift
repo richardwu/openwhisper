@@ -1,5 +1,32 @@
 import Foundation
 
+enum WhisperModel: String, CaseIterable {
+    case base
+    case small
+    case medium
+
+    var fileName: String {
+        switch self {
+        case .base:   return "ggml-base.en.bin"
+        case .small:  return "ggml-small.en-q5_1.bin"
+        case .medium: return "ggml-medium.en-q5_0.bin"
+        }
+    }
+
+    var downloadURL: URL {
+        let base = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/"
+        return URL(string: base + fileName)!
+    }
+
+    var displayName: String {
+        switch self {
+        case .base:   return "Base (142 MB, very fast)"
+        case .small:  return "Small (181 MB, fast)"
+        case .medium: return "Medium (514 MB, not as fast)"
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class ModelManager {
@@ -7,23 +34,24 @@ final class ModelManager {
     var downloadProgress: Double = 0
     var errorMessage: String?
 
-    private static let modelFileName = "ggml-base.en.bin"
-    private static let modelDownloadURL = URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin")!
+    private var downloadTask: Task<Void, Never>?
+    private var downloadGeneration: Int = 0
+
+    var selectedModel: WhisperModel {
+        didSet {
+            UserDefaults.standard.set(selectedModel.rawValue, forKey: "selectedModel")
+        }
+    }
 
     var isModelReady: Bool {
         modelFileURL != nil
     }
 
     var modelFileURL: URL? {
-        // 1. Bundled model (release builds)
-        if let bundled = Bundle.main.url(forResource: "ggml-base.en", withExtension: "bin") {
-            return bundled
-        }
-        // 2. Downloaded model (dev fallback)
         guard let dir = modelsDirectory else { return nil }
-        let downloaded = dir.appendingPathComponent(Self.modelFileName)
-        if FileManager.default.fileExists(atPath: downloaded.path) {
-            return downloaded
+        let path = dir.appendingPathComponent(selectedModel.fileName)
+        if FileManager.default.fileExists(atPath: path.path) {
+            return path
         }
         return nil
     }
@@ -39,8 +67,37 @@ final class ModelManager {
             .appendingPathComponent("Models")
     }
 
-    func ensureModelAvailable() async {
+    init() {
+        let stored = UserDefaults.standard.string(forKey: "selectedModel") ?? ""
+        self.selectedModel = WhisperModel(rawValue: stored) ?? .small
+    }
+
+    func ensureModelAvailable() {
         if !isModelReady {
+            startDownload()
+        }
+    }
+
+    func selectModel(_ model: WhisperModel) {
+        downloadTask?.cancel()
+        downloadTask = nil
+        downloadGeneration &+= 1
+        selectedModel = model
+        if !isModelReady {
+            downloadTask = Task {
+                await downloadModel()
+            }
+        } else {
+            isDownloading = false
+            downloadProgress = 1.0
+        }
+    }
+
+    func startDownload() {
+        downloadTask?.cancel()
+        downloadTask = nil
+        downloadGeneration &+= 1
+        downloadTask = Task {
             await downloadModel()
         }
     }
@@ -58,27 +115,35 @@ final class ModelManager {
             return
         }
 
-        let destinationURL = modelsDir.appendingPathComponent(Self.modelFileName)
+        let destinationURL = modelsDir.appendingPathComponent(selectedModel.fileName)
 
         isDownloading = true
         downloadProgress = 0
         errorMessage = nil
 
+        let generation = self.downloadGeneration
+
         do {
+            try Task.checkCancellation()
+
             let config = URLSessionConfiguration.default
             config.timeoutIntervalForRequest = 300    // 5 min per chunk
             config.timeoutIntervalForResource = 3600  // 1 hour total
-
             let delegate = DownloadDelegate { [weak self] progress in
                 Task { @MainActor in
-                    self?.downloadProgress = progress
+                    guard let self, self.downloadGeneration == generation else { return }
+                    self.downloadProgress = progress
                 }
             }
 
-            let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+            let session = URLSession(configuration: config, delegate: delegate, delegateQueue: OperationQueue.main)
             defer { session.invalidateAndCancel() }
 
-            let (tempURL, response) = try await delegate.download(session: session, from: Self.modelDownloadURL)
+            let (tempURL, response) = try await withTaskCancellationHandler {
+                try await delegate.download(session: session, from: selectedModel.downloadURL)
+            } onCancel: {
+                session.invalidateAndCancel()
+            }
 
             guard let httpResponse = response as? HTTPURLResponse,
                   (200...299).contains(httpResponse.statusCode) else {
@@ -90,9 +155,15 @@ final class ModelManager {
             }
             try FileManager.default.moveItem(at: tempURL, to: destinationURL)
 
+            guard self.downloadGeneration == generation else { return }
             isDownloading = false
             downloadProgress = 1.0
+        } catch is CancellationError {
+            // Don't reset isDownloading — the replacement download will take over
+        } catch let error as URLError where error.code == .cancelled {
+            // Don't reset isDownloading — the replacement download will take over
         } catch {
+            guard self.downloadGeneration == generation else { return }
             isDownloading = false
             errorMessage = "Download failed: \(error.localizedDescription)"
         }
@@ -127,7 +198,12 @@ private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
         let tempFile = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".bin")
         do {
             try FileManager.default.copyItem(at: location, to: tempFile)
-            continuation?.resume(returning: (tempFile, downloadTask.response!))
+            guard let response = downloadTask.response else {
+                continuation?.resume(throwing: URLError(.badServerResponse))
+                continuation = nil
+                return
+            }
+            continuation?.resume(returning: (tempFile, response))
         } catch {
             continuation?.resume(throwing: error)
         }

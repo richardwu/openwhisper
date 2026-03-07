@@ -8,6 +8,7 @@ final class OverlayState {
         case recording
         case transcribing
         case cancelled
+        case modelDownloading
         case accessibilityRequired
     }
 

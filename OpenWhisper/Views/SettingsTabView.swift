@@ -6,6 +6,14 @@ struct SettingsTabView: View {
     @State private var micAuthorized = Permissions.isMicrophoneAuthorized
     @State private var accessibilityGranted = Permissions.isAccessibilityGranted
 
+    // TODO: Re-enable when system prompt UI is restored
+    // @State private var promptText: String = ""
+    // @State private var isSaving = false
+    // @State private var showSaved = false
+    // @State private var saveTask: Task<Void, Never>?
+    // @State private var hideSavedTask: Task<Void, Never>?
+    // private let maxPromptLength = 500
+
     private let permissionTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -19,7 +27,21 @@ struct SettingsTabView: View {
                 }
             }
 
+            // TODO: Re-enable system prompt UI once prompt quality is improved
+            // Section("System Prompt") {
+            //     ...
+            // }
+
             Section("Model") {
+                Picker("Model", selection: Binding(
+                    get: { appState.modelManager.selectedModel },
+                    set: { appState.modelManager.selectModel($0) }
+                )) {
+                    ForEach(WhisperModel.allCases, id: \.self) { model in
+                        Text(model.displayName).tag(model)
+                    }
+                }
+
                 if appState.modelManager.isModelReady {
                     Label("Model ready", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
@@ -39,16 +61,12 @@ struct SettingsTabView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Button("Retry Download") {
-                            Task {
-                                await appState.modelManager.downloadModel()
-                            }
+                            appState.modelManager.startDownload()
                         }
                     }
                 } else {
                     Button("Download Model") {
-                        Task {
-                            await appState.modelManager.downloadModel()
-                        }
+                        appState.modelManager.startDownload()
                     }
                 }
             }
@@ -85,6 +103,7 @@ struct SettingsTabView: View {
         .onAppear {
             micAuthorized = Permissions.isMicrophoneAuthorized
             accessibilityGranted = Permissions.isAccessibilityGranted
+            // promptText = appState.systemPrompt
         }
     }
 }

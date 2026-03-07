@@ -13,7 +13,7 @@ struct OpenWhisperApp: App {
         Window("OpenWhisper", id: "main") {
             MainWindowView(appState: appState)
         }
-        .defaultSize(width: 620, height: 500)
+        .defaultSize(width: 620, height: 525)
         .commands {
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates...") {
