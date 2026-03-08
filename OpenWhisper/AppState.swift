@@ -37,8 +37,7 @@ final class AppState {
             }
         }
 
-        // Cancel hotkey starts disabled — only enabled while recording
-        KeyboardShortcuts.disable(.cancelRecording)
+        syncCancelRecordingHotkey()
 
         // Auto-download model on first launch
         modelManager.ensureModelAvailable()
@@ -58,7 +57,7 @@ final class AppState {
         isRecording = false
         statusMessage = "Ready"
         overlayState.phase = .cancelled
-        KeyboardShortcuts.disable(.cancelRecording)
+        syncCancelRecordingHotkey()
 
         // Show "Recording Cancelled" briefly, then dismiss
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
@@ -96,7 +95,7 @@ final class AppState {
             statusMessage = "Recording..."
             overlayState.phase = .recording
             overlayController?.show()
-            KeyboardShortcuts.enable(.cancelRecording)
+            syncCancelRecordingHotkey()
         } catch {
             statusMessage = "Mic error: \(error.localizedDescription)"
         }
@@ -120,7 +119,7 @@ final class AppState {
     private func stopRecordingAndTranscribe() async {
         let samples = audioRecorder.stopRecording()
         isRecording = false
-        KeyboardShortcuts.disable(.cancelRecording)
+        syncCancelRecordingHotkey()
 
         guard !samples.isEmpty else {
             statusMessage = "No audio captured"
@@ -162,5 +161,13 @@ final class AppState {
         isTranscribing = false
         overlayState.phase = .hidden
         overlayController?.dismiss()
+    }
+
+    func syncCancelRecordingHotkey() {
+        if isRecording {
+            KeyboardShortcuts.enable(.cancelRecording)
+        } else {
+            KeyboardShortcuts.disable(.cancelRecording)
+        }
     }
 }

@@ -9,6 +9,7 @@ struct ShortcutRecorder: View {
     @State private var isRecording = false
     @State private var currentShortcut: KeyboardShortcuts.Shortcut?
     @State private var eventMonitor: Any?
+    @State private var wasShortcutEnabledBeforeRecording = false
 
     var body: some View {
         HStack {
@@ -39,7 +40,9 @@ struct ShortcutRecorder: View {
             currentShortcut = KeyboardShortcuts.getShortcut(for: name) ?? name.defaultShortcut
         }
         .onDisappear {
-            stopRecording()
+            if isRecording {
+                stopRecording()
+            }
         }
     }
 
@@ -55,6 +58,7 @@ struct ShortcutRecorder: View {
 
     private func startRecording() {
         isRecording = true
+        wasShortcutEnabledBeforeRecording = KeyboardShortcuts.isEnabled(for: name)
         // Temporarily disable the shortcut so it doesn't fire while we record a new one
         KeyboardShortcuts.disable(name)
 
@@ -75,8 +79,12 @@ struct ShortcutRecorder: View {
             NSEvent.removeMonitor(monitor)
             eventMonitor = nil
         }
-        // Re-enable the shortcut
-        KeyboardShortcuts.enable(name)
+
+        if wasShortcutEnabledBeforeRecording {
+            KeyboardShortcuts.enable(name)
+        } else {
+            KeyboardShortcuts.disable(name)
+        }
     }
 
     private func shortcutDisplayString(_ shortcut: KeyboardShortcuts.Shortcut) -> String {
