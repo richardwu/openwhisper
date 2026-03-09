@@ -82,6 +82,11 @@ final class AudioRecorder {
         return result
     }
 
+    /// Returns a copy of the currently accumulated audio samples without stopping the recording.
+    func currentSamples() -> [Float] {
+        return samples
+    }
+
     private nonisolated func convert(
         buffer: AVAudioPCMBuffer,
         converter: AVAudioConverter,

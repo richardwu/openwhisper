@@ -24,15 +24,34 @@ struct RecordingOverlayContent: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var recordingView: some View {
-        HStack(spacing: 12) {
-            // Pulsing red dot
-            Circle()
-                .fill(.red)
-                .frame(width: 10, height: 10)
-                .modifier(PulsingModifier())
+    private var partialTranscriptionDisplay: String {
+        let text = overlayState.partialTranscription
+        if text.count > 100 {
+            return "…" + text.suffix(100)
+        }
+        return text
+    }
 
-            WaveformView(levels: audioRecorder.recentLevels)
+    private var recordingView: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 12) {
+                // Pulsing red dot
+                Circle()
+                    .fill(.red)
+                    .frame(width: 10, height: 10)
+                    .modifier(PulsingModifier())
+
+                WaveformView(levels: audioRecorder.recentLevels)
+            }
+
+            if !overlayState.partialTranscription.isEmpty {
+                Text(partialTranscriptionDisplay)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .lineLimit(2)
+                    .truncationMode(.head)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)

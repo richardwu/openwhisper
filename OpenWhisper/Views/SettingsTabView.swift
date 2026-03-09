@@ -3,6 +3,7 @@ import KeyboardShortcuts
 
 struct SettingsTabView: View {
     let appState: AppState
+    @AppStorage("realtimeTranscriptionEnabled") private var realtimeTranscriptionEnabled: Bool = true
     @State private var micAuthorized = Permissions.isMicrophoneAuthorized
     @State private var accessibilityGranted = Permissions.isAccessibilityGranted
 
@@ -18,6 +19,13 @@ struct SettingsTabView: View {
 
     var body: some View {
         Form {
+            Section("Transcription") {
+                Toggle("Realtime Transcription", isOn: $realtimeTranscriptionEnabled)
+                Text("Transcribe and show text live while recording. Text is refined when recording stops.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Hotkeys") {
                 LabeledContent("Toggle Recording") {
                     ShortcutRecorder(name: .toggleRecording)

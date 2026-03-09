@@ -13,4 +13,5 @@ final class OverlayState {
     }
 
     var phase: Phase = .hidden
+    var partialTranscription: String = ""
 }

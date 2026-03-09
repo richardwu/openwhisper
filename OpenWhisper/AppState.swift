@@ -11,13 +11,19 @@ final class AppState {
     @ObservationIgnored
     @AppStorage("systemPrompt") var systemPrompt: String = ""
 
+    @ObservationIgnored
+    @AppStorage("realtimeTranscriptionEnabled") var realtimeTranscriptionEnabled: Bool = true
+
     let audioRecorder = AudioRecorder()
     let transcriptionService = TranscriptionService()
     let pasteService = PasteService()
     let modelManager = ModelManager()
     let overlayState = OverlayState()
     let historyStore = HistoryStore()
+    let realtimeTranscriptionService = RealtimeTranscriptionService()
+    let realtimePasteService = RealtimePasteService()
     private(set) var overlayController: OverlayController?
+    private var realtimeTask: Task<Void, Never>?
 
     init() {
         // Create overlay controller after all properties are initialized
@@ -60,6 +66,12 @@ final class AppState {
         overlayState.phase = .cancelled
         KeyboardShortcuts.disable(.cancelRecording)
 
+        realtimeTask?.cancel()
+        realtimeTask = nil
+        Task { await realtimeTranscriptionService.cancelIfRunning() }
+        realtimePasteService.reset()
+        overlayState.partialTranscription = ""
+
         // Show "Recording Cancelled" briefly, then dismiss
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
             self?.overlayState.phase = .hidden
@@ -97,6 +109,45 @@ final class AppState {
             overlayState.phase = .recording
             overlayController?.show()
             KeyboardShortcuts.enable(.cancelRecording)
+
+            if realtimeTranscriptionEnabled && Permissions.isAccessibilityGranted {
+                realtimeTask = Task { [weak self] in
+                    while !Task.isCancelled {
+                        do {
+                            try await Task.sleep(for: .seconds(3))
+                        } catch {
+                            break
+                        }
+
+                        guard let self else { break }
+
+                        let samples = audioRecorder.currentSamples()
+                        guard samples.count >= 16_000 else { continue }
+                        guard let modelURL = modelManager.modelFileURL, modelManager.isModelReady else { continue }
+
+                        do {
+                            let text = try await realtimeTranscriptionService.transcribeChunk(
+                                audioFrames: samples,
+                                modelURL: modelURL
+                            )
+
+                            guard !Task.isCancelled else { break }
+
+                            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !trimmed.isEmpty {
+                                realtimePasteService.updateText(text)
+                                overlayState.partialTranscription = text
+                            }
+                        } catch is CancellationError {
+                            break
+                        } catch {
+                            // Log and continue — don't crash the realtime loop
+                            print("Realtime transcription error: \(error.localizedDescription)")
+                            continue
+                        }
+                    }
+                }
+            }
         } catch {
             statusMessage = "Mic error: \(error.localizedDescription)"
         }
@@ -118,12 +169,19 @@ final class AppState {
     }
 
     private func stopRecordingAndTranscribe() async {
+        realtimeTask?.cancel()
+        realtimeTask = nil
+        await realtimeTranscriptionService.cancelIfRunning()
+
         let samples = audioRecorder.stopRecording()
         isRecording = false
         KeyboardShortcuts.disable(.cancelRecording)
 
+        overlayState.partialTranscription = ""
+
         guard !samples.isEmpty else {
             statusMessage = "No audio captured"
+            realtimePasteService.reset()
             overlayState.phase = .hidden
             overlayController?.dismiss()
             return
@@ -131,6 +189,7 @@ final class AppState {
 
         guard let modelURL = modelManager.modelFileURL, modelManager.isModelReady else {
             statusMessage = "Model not available"
+            realtimePasteService.reset()
             overlayState.phase = .hidden
             overlayController?.dismiss()
             return
@@ -150,13 +209,21 @@ final class AppState {
 
             if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 statusMessage = "No speech detected"
+                realtimePasteService.reset()
             } else {
-                pasteService.paste(text: text)
+                if realtimePasteService.hasTypedText {
+                    realtimePasteService.selectCurrentText()
+                    pasteService.paste(text: text)
+                    realtimePasteService.reset()
+                } else {
+                    pasteService.paste(text: text)
+                }
                 historyStore.add(text: text)
                 statusMessage = "Pasted: \(String(text.prefix(50)))\(text.count > 50 ? "..." : "")"
             }
         } catch {
             statusMessage = "Transcription error: \(error.localizedDescription)"
+            realtimePasteService.reset()
         }
 
         isTranscribing = false

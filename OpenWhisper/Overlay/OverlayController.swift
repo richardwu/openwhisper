@@ -15,8 +15,8 @@ final class OverlayController {
     func show() {
         if panel != nil { return }
 
-        let panelWidth: CGFloat = 280
-        let panelHeight: CGFloat = 80
+        let panelWidth: CGFloat = 340
+        let panelHeight: CGFloat = 110
 
         // Position at bottom-center of the screen containing the mouse cursor
         let mouseLocation = NSEvent.mouseLocation
