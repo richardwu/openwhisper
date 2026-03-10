@@ -164,13 +164,18 @@ ITEM
 )
 
 APPCAST_FILE="$PROJECT_DIR/appcast.xml"
+NEW_ITEM_FILE=$(mktemp)
+echo "$NEW_ITEM" > "$NEW_ITEM_FILE"
+
 if [ -f "$APPCAST_FILE" ] && grep -q '<channel>' "$APPCAST_FILE"; then
   # Insert new item at the top of the channel (after </title>), keeping all previous items
   TMPCAST=$(mktemp)
-  awk -v new_item="$NEW_ITEM" '
-    /<\/title>/ { print; print new_item; next }
-    { print }
-  ' "$APPCAST_FILE" > "$TMPCAST"
+  while IFS= read -r line; do
+    echo "$line"
+    if echo "$line" | grep -q '</title>'; then
+      cat "$NEW_ITEM_FILE"
+    fi
+  done < "$APPCAST_FILE" > "$TMPCAST"
   mv "$TMPCAST" "$APPCAST_FILE"
 else
   # Create fresh appcast
@@ -184,6 +189,7 @@ $NEW_ITEM
 </rss>
 EOF
 fi
+rm -f "$NEW_ITEM_FILE"
 
 cp "$APPCAST_FILE" "$BUILD_DIR/appcast.xml"
 echo "    Appcast updated ($(grep -c '<item>' "$APPCAST_FILE") versions)"
