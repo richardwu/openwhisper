@@ -24,7 +24,7 @@ cd "$PROJECT_DIR"
 echo "==> Checking prerequisites..."
 
 command -v xcodegen >/dev/null || { echo "Error: xcodegen not found (brew install xcodegen)"; exit 1; }
-command -v create-dmg >/dev/null || { echo "Error: create-dmg not found (brew install create-dmg)"; exit 1; }
+command -v hdiutil >/dev/null || { echo "Error: hdiutil not found (should be built-in on macOS)"; exit 1; }
 command -v gh >/dev/null || { echo "Error: gh not found (brew install gh)"; exit 1; }
 command -v xcrun >/dev/null || { echo "Error: xcrun not found (install Xcode)"; exit 1; }
 
@@ -108,16 +108,20 @@ xcrun stapler staple "$APP_PATH"
 
 # --- DMG ---
 echo "==> Creating DMG..."
-create-dmg \
-  --volname "$APP_NAME" \
-  --window-pos 200 120 \
-  --window-size 600 400 \
-  --icon-size 100 \
-  --icon "$APP_NAME.app" 150 190 \
-  --app-drop-link 450 190 \
-  "$BUILD_DIR/$APP_NAME.dmg" \
-  "$APP_PATH" \
-  || true  # create-dmg exits 2 on success when no background image is set
+# Use hdiutil directly instead of create-dmg to avoid Full Disk Access issues.
+# xcodebuild -exportArchive produces root-owned files, so we ditto to a temp dir first.
+DMG_STAGING=$(mktemp -d)
+DMG_VOL=$(mktemp -d)
+DMG_RW="$DMG_STAGING/$APP_NAME-rw.dmg"
+
+ditto "$APP_PATH" "$DMG_STAGING/$APP_NAME.app"
+hdiutil create -size 50m -fs HFS+ -volname "$APP_NAME" "$DMG_RW"
+hdiutil attach "$DMG_RW" -mountpoint "$DMG_VOL"
+ditto "$DMG_STAGING/$APP_NAME.app" "$DMG_VOL/$APP_NAME.app"
+ln -s /Applications "$DMG_VOL/Applications"
+hdiutil detach "$DMG_VOL"
+hdiutil convert "$DMG_RW" -format UDZO -imagekey zlib-level=9 -o "$BUILD_DIR/$APP_NAME.dmg"
+rm -rf "$DMG_STAGING"
 
 if [ ! -f "$BUILD_DIR/$APP_NAME.dmg" ]; then
   echo "Error: DMG creation failed"
@@ -139,15 +143,11 @@ ED_SIGNATURE=$(echo "$SPARKLE_SIG" | sed -n 's/.*sparkle:edSignature="\([^"]*\)"
 DMG_SIZE=$(stat -f%z "$BUILD_DIR/$APP_NAME.dmg")
 
 # --- Appcast ---
-echo "==> Generating appcast.xml..."
+echo "==> Updating appcast.xml..."
 BUILD_NUMBER=$(grep 'CURRENT_PROJECT_VERSION' project.yml | head -1 | sed 's/.*: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/')
 DATE=$(date -R)
 
-cat > "$BUILD_DIR/appcast.xml" <<EOF
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
-  <channel>
-    <title>$APP_NAME</title>
+NEW_ITEM=$(cat <<ITEM
     <item>
       <title>Version $VERSION</title>
       <pubDate>$DATE</pubDate>
@@ -160,14 +160,35 @@ cat > "$BUILD_DIR/appcast.xml" <<EOF
         sparkle:edSignature="$ED_SIGNATURE"
       />
     </item>
+ITEM
+)
+
+APPCAST_FILE="$PROJECT_DIR/appcast.xml"
+if [ -f "$APPCAST_FILE" ] && grep -q '<channel>' "$APPCAST_FILE"; then
+  # Insert new item at the top of the channel (after </title>), keeping all previous items
+  TMPCAST=$(mktemp)
+  awk -v new_item="$NEW_ITEM" '
+    /<\/title>/ { print; print new_item; next }
+    { print }
+  ' "$APPCAST_FILE" > "$TMPCAST"
+  mv "$TMPCAST" "$APPCAST_FILE"
+else
+  # Create fresh appcast
+  cat > "$APPCAST_FILE" <<EOF
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>$APP_NAME</title>
+$NEW_ITEM
   </channel>
 </rss>
 EOF
+fi
 
-echo "    Appcast written to $BUILD_DIR/appcast.xml"
+cp "$APPCAST_FILE" "$BUILD_DIR/appcast.xml"
+echo "    Appcast updated ($(grep -c '<item>' "$APPCAST_FILE") versions)"
 
 # --- Done ---
-cp "$BUILD_DIR/appcast.xml" "$PROJECT_DIR/appcast.xml"
 
 echo ""
 echo "=== Build $VERSION complete ==="

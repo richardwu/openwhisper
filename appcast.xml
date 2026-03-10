@@ -3,6 +3,18 @@
   <channel>
     <title>OpenWhisper</title>
     <item>
+      <title>Version 0.3.0</title>
+      <pubDate>Tue, 10 Mar 2026 07:40:20 -0400</pubDate>
+      <sparkle:version>3</sparkle:version>
+      <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
+      <enclosure
+        url="https://github.com/richardwu/openwhisper/releases/download/v0.3.0/OpenWhisper.dmg"
+        length="2139945"
+        type="application/octet-stream"
+        sparkle:edSignature="pnbtG4l/3ffJsEHAccQg97imsa2vPnpz2MPLe0xV5AZnhd3Jcd1DVGplLLO06A10FEBICtnssF0fkm5X0plRAg=="
+      />
+    </item>
+    <item>
       <title>Version 0.2.0</title>
       <pubDate>Fri, 13 Feb 2026 14:13:11 -0500</pubDate>
       <sparkle:version>2</sparkle:version>
@@ -12,6 +24,18 @@
         length="135802406"
         type="application/octet-stream"
         sparkle:edSignature="XUQEwknUINfudG7ZgOSreIEKvl9FtQu0Prwd9H4EZrAeaOpxpHDS4O0Dt+ue0DjvVtZQU8jnowy0WyzAiPwgAg=="
+      />
+    </item>
+    <item>
+      <title>Version 0.1.0</title>
+      <pubDate>Fri, 13 Feb 2026 10:59:23 -0500</pubDate>
+      <sparkle:version>1</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <enclosure
+        url="https://github.com/richardwu/openwhisper/releases/download/v0.1.0/OpenWhisper.dmg"
+        length="135799992"
+        type="application/octet-stream"
+        sparkle:edSignature="RWBVcdXUgFYIU9F38WYabS4D51IFzo9VnASTMWkMbs5rH6Z71ADTG8iGyht947QLPjkbUN1WML5YVFq7/vW8AA=="
       />
     </item>
   </channel>
