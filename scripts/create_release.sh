@@ -175,8 +175,16 @@ def make_item():
 try:
     tree = ET.parse(appcast_file)
     channel = tree.find("channel")
-    # Insert after <title> (index 1)
-    channel.insert(1, make_item())
+    # Replace existing item for this version, or insert as first item
+    svs_tag = f"{{{SPARKLE_NS}}}shortVersionString"
+    existing = [item for item in channel.findall("item") if item.findtext(svs_tag) == version]
+    if existing:
+        for old in existing:
+            idx = list(channel).index(old)
+            channel.remove(old)
+            channel.insert(idx, make_item())
+    else:
+        channel.insert(1, make_item())
 except (FileNotFoundError, ET.ParseError):
     rss = ET.Element("rss", version="2.0")
     rss.set("xmlns:sparkle", SPARKLE_NS)
