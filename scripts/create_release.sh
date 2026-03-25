@@ -53,7 +53,7 @@ echo "==> Generating Xcode project..."
 xcodegen generate
 
 echo "==> Archiving Release build..."
-rm -rf "$BUILD_DIR"
+sudo rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
 xcodebuild archive \
@@ -146,50 +146,51 @@ DMG_SIZE=$(stat -f%z "$BUILD_DIR/$APP_NAME.dmg")
 echo "==> Updating appcast.xml..."
 BUILD_NUMBER=$(grep 'CURRENT_PROJECT_VERSION' project.yml | head -1 | sed 's/.*: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/')
 DATE=$(date -R)
-
-NEW_ITEM=$(cat <<ITEM
-    <item>
-      <title>Version $VERSION</title>
-      <pubDate>$DATE</pubDate>
-      <sparkle:version>$BUILD_NUMBER</sparkle:version>
-      <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
-      <enclosure
-        url="https://github.com/$REPO/releases/download/$TAG/$APP_NAME.dmg"
-        length="$DMG_SIZE"
-        type="application/octet-stream"
-        sparkle:edSignature="$ED_SIGNATURE"
-      />
-    </item>
-ITEM
-)
+DOWNLOAD_URL="https://github.com/$REPO/releases/download/$TAG/$APP_NAME.dmg"
 
 APPCAST_FILE="$PROJECT_DIR/appcast.xml"
-NEW_ITEM_FILE=$(mktemp)
-echo "$NEW_ITEM" > "$NEW_ITEM_FILE"
 
-if [ -f "$APPCAST_FILE" ] && grep -q '<channel>' "$APPCAST_FILE"; then
-  # Insert new item at the top of the channel (after </title>), keeping all previous items
-  TMPCAST=$(mktemp)
-  while IFS= read -r line; do
-    echo "$line"
-    if echo "$line" | grep -q '</title>'; then
-      cat "$NEW_ITEM_FILE"
-    fi
-  done < "$APPCAST_FILE" > "$TMPCAST"
-  mv "$TMPCAST" "$APPCAST_FILE"
-else
-  # Create fresh appcast
-  cat > "$APPCAST_FILE" <<EOF
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
-  <channel>
-    <title>$APP_NAME</title>
-$NEW_ITEM
-  </channel>
-</rss>
-EOF
-fi
-rm -f "$NEW_ITEM_FILE"
+python3 - "$APPCAST_FILE" "$VERSION" "$BUILD_NUMBER" "$DATE" "$DOWNLOAD_URL" "$DMG_SIZE" "$ED_SIGNATURE" "$APP_NAME" <<'PYEOF'
+import sys
+import xml.etree.ElementTree as ET
+
+appcast_file, version, build_number, date, url, length, signature, app_name = sys.argv[1:]
+
+SPARKLE_NS = "http://www.andymatuschak.org/xml-namespaces/sparkle"
+ET.register_namespace("sparkle", SPARKLE_NS)
+
+def make_item():
+    item = ET.Element("item")
+    ET.SubElement(item, "title").text = f"Version {version}"
+    ET.SubElement(item, "pubDate").text = date
+    ET.SubElement(item, f"{{{SPARKLE_NS}}}version").text = build_number
+    ET.SubElement(item, f"{{{SPARKLE_NS}}}shortVersionString").text = version
+    enc = ET.SubElement(item, "enclosure")
+    enc.set("url", url)
+    enc.set("length", length)
+    enc.set("type", "application/octet-stream")
+    enc.set(f"{{{SPARKLE_NS}}}edSignature", signature)
+    return item
+
+try:
+    tree = ET.parse(appcast_file)
+    channel = tree.find("channel")
+    # Insert after <title> (index 1)
+    channel.insert(1, make_item())
+except (FileNotFoundError, ET.ParseError):
+    rss = ET.Element("rss", version="2.0")
+    rss.set("xmlns:sparkle", SPARKLE_NS)
+    channel = ET.SubElement(rss, "channel")
+    ET.SubElement(channel, "title").text = app_name
+    channel.append(make_item())
+    tree = ET.ElementTree(rss)
+
+ET.indent(tree, space="  ")
+tree.write(appcast_file, xml_declaration=True, encoding="unicode")
+# Ensure trailing newline
+with open(appcast_file, "a") as f:
+    f.write("\n")
+PYEOF
 
 cp "$APPCAST_FILE" "$BUILD_DIR/appcast.xml"
 echo "    Appcast updated ($(grep -c '<item>' "$APPCAST_FILE") versions)"

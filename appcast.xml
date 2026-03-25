@@ -1,42 +1,27 @@
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+<?xml version='1.0' encoding='utf-8'?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
   <channel>
     <title>OpenWhisper</title>
     <item>
       <title>Version 0.3.0</title>
-      <pubDate>Tue, 10 Mar 2026 12:02:57 -0400</pubDate>
+      <pubDate>Wed, 25 Mar 2026 17:51:05 -0400</pubDate>
       <sparkle:version>3</sparkle:version>
       <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
-      <enclosure
-        url="https://github.com/richardwu/openwhisper/releases/download/v0.3.0/OpenWhisper.dmg"
-        length="2139948"
-        type="application/octet-stream"
-        sparkle:edSignature="zQgnpMFprc5WHEAa5pEEm0TlXtj8ZYSZCBcSIO7w2HEqnxI8oD0/hDXnoR5ooRaa8Nj5DWS5u1WyIHgW1F5oBw=="
-      />
+      <enclosure url="https://github.com/richardwu/openwhisper/releases/download/v0.3.0/OpenWhisper.dmg" length="2139959" type="application/octet-stream" sparkle:edSignature="DbfIdQ8tkrvfdn5spxOQGprustS4yZRe35FifOne4d1pVjOUvesUU8sDPViYLX19sYkgjEzKC+QXCZ0Y5yHoDQ==" />
     </item>
     <item>
       <title>Version 0.2.0</title>
       <pubDate>Fri, 13 Feb 2026 14:13:11 -0500</pubDate>
       <sparkle:version>2</sparkle:version>
       <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
-      <enclosure
-        url="https://github.com/richardwu/openwhisper/releases/download/v0.2.0/OpenWhisper.dmg"
-        length="135802406"
-        type="application/octet-stream"
-        sparkle:edSignature="XUQEwknUINfudG7ZgOSreIEKvl9FtQu0Prwd9H4EZrAeaOpxpHDS4O0Dt+ue0DjvVtZQU8jnowy0WyzAiPwgAg=="
-      />
+      <enclosure url="https://github.com/richardwu/openwhisper/releases/download/v0.2.0/OpenWhisper.dmg" length="135802406" type="application/octet-stream" sparkle:edSignature="XUQEwknUINfudG7ZgOSreIEKvl9FtQu0Prwd9H4EZrAeaOpxpHDS4O0Dt+ue0DjvVtZQU8jnowy0WyzAiPwgAg==" />
     </item>
     <item>
       <title>Version 0.1.0</title>
       <pubDate>Fri, 13 Feb 2026 10:59:23 -0500</pubDate>
       <sparkle:version>1</sparkle:version>
       <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
-      <enclosure
-        url="https://github.com/richardwu/openwhisper/releases/download/v0.1.0/OpenWhisper.dmg"
-        length="135799992"
-        type="application/octet-stream"
-        sparkle:edSignature="RWBVcdXUgFYIU9F38WYabS4D51IFzo9VnASTMWkMbs5rH6Z71ADTG8iGyht947QLPjkbUN1WML5YVFq7/vW8AA=="
-      />
+      <enclosure url="https://github.com/richardwu/openwhisper/releases/download/v0.1.0/OpenWhisper.dmg" length="135799992" type="application/octet-stream" sparkle:edSignature="RWBVcdXUgFYIU9F38WYabS4D51IFzo9VnASTMWkMbs5rH6Z71ADTG8iGyht947QLPjkbUN1WML5YVFq7/vW8AA==" />
     </item>
   </channel>
 </rss>
