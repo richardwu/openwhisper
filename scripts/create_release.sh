@@ -35,7 +35,11 @@ if ! security find-identity -v -p codesigning | grep -q "Developer ID Applicatio
   exit 1
 fi
 
-TEAM_ID=$(security find-certificate -c "Developer ID Application" -p | openssl x509 -noout -subject 2>/dev/null | sed -n 's/.*OU=\([^,]*\).*/\1/p')
+TEAM_ID=$(security find-certificate -c "Developer ID Application" -p | openssl x509 -noout -subject 2>/dev/null | sed -n 's/.*OU *= *\([^,]*\).*/\1/p')
+if [ -z "$TEAM_ID" ]; then
+  echo "Error: Could not extract Team ID from Developer ID certificate"
+  exit 1
+fi
 echo "    Team ID: $TEAM_ID"
 echo "    Version: $VERSION (tag: $TAG)"
 

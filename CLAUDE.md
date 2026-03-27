@@ -98,4 +98,4 @@ Prerequisites:
 - `Developer ID Application` certificate in keychain
 - Sparkle EdDSA key (`generate_keys` from Sparkle SPM artifact)
 - Notarization credentials stored via `xcrun notarytool store-credentials notarytool`
-- CLI tools: `xcodegen`, `create-dmg`, `gh`
+- CLI tools: `xcodegen`, `gh`
