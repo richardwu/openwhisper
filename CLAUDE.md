@@ -86,10 +86,10 @@ Key files:
 
 ## Releasing
 
-Releases are created locally via `bin/create_release`:
+Releases are created locally via `scripts/create_release.sh`:
 
 ```bash
-bin/create_release 0.2.0
+scripts/create_release.sh 0.2.0
 ```
 
 The script handles: xcodegen → archive → code sign (Developer ID) → notarize → DMG → Sparkle sign → appcast.xml → GitHub Release.
@@ -98,4 +98,4 @@ Prerequisites:
 - `Developer ID Application` certificate in keychain
 - Sparkle EdDSA key (`generate_keys` from Sparkle SPM artifact)
 - Notarization credentials stored via `xcrun notarytool store-credentials notarytool`
-- CLI tools: `xcodegen`, `create-dmg`, `gh`
+- CLI tools: `xcodegen`, `gh`
