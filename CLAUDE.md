@@ -86,10 +86,10 @@ Key files:
 
 ## Releasing
 
-Releases are created locally via `bin/create_release`:
+Releases are created locally via `scripts/create_release.sh`:
 
 ```bash
-bin/create_release 0.2.0
+scripts/create_release.sh 0.2.0
 ```
 
 The script handles: xcodegen → archive → code sign (Developer ID) → notarize → DMG → Sparkle sign → appcast.xml → GitHub Release.

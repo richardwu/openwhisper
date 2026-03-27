@@ -7,8 +7,8 @@ REPO="richardwu/openwhisper"
 
 # --- Parse args ---
 if [ $# -lt 1 ]; then
-  echo "Usage: bin/create_release <VERSION>"
-  echo "  e.g. bin/create_release 0.2.0"
+  echo "Usage: scripts/create_release.sh <VERSION>"
+  echo "  e.g. scripts/create_release.sh 0.2.0"
   exit 1
 fi
 
@@ -113,15 +113,18 @@ echo "==> Creating DMG..."
 DMG_STAGING=$(mktemp -d)
 DMG_VOL=$(mktemp -d)
 DMG_RW="$DMG_STAGING/$APP_NAME-rw.dmg"
+trap 'hdiutil detach "$DMG_VOL" 2>/dev/null || true; rm -rf "$DMG_STAGING" "$DMG_VOL"' EXIT
 
 ditto "$APP_PATH" "$DMG_STAGING/$APP_NAME.app"
-hdiutil create -size 50m -fs HFS+ -volname "$APP_NAME" "$DMG_RW"
+APP_SIZE_MB=$(du -sm "$DMG_STAGING/$APP_NAME.app" | awk '{print $1}')
+DMG_SIZE_MB=$((APP_SIZE_MB + 50))
+hdiutil create -size "${DMG_SIZE_MB}m" -fs HFS+ -volname "$APP_NAME" "$DMG_RW"
 hdiutil attach "$DMG_RW" -mountpoint "$DMG_VOL"
 ditto "$DMG_STAGING/$APP_NAME.app" "$DMG_VOL/$APP_NAME.app"
 ln -s /Applications "$DMG_VOL/Applications"
 hdiutil detach "$DMG_VOL"
 hdiutil convert "$DMG_RW" -format UDZO -imagekey zlib-level=9 -o "$BUILD_DIR/$APP_NAME.dmg"
-rm -rf "$DMG_STAGING"
+rm -rf "$DMG_STAGING" "$DMG_VOL"
 
 if [ ! -f "$BUILD_DIR/$APP_NAME.dmg" ]; then
   echo "Error: DMG creation failed"
