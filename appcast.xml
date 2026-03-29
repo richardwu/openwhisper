@@ -3,6 +3,13 @@
   <channel>
     <title>OpenWhisper</title>
     <item>
+      <title>Version 0.3.0</title>
+      <pubDate>Sun, 29 Mar 2026 17:06:19 -0400</pubDate>
+      <sparkle:version>3</sparkle:version>
+      <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
+      <enclosure url="https://github.com/richardwu/openwhisper/releases/download/v0.3.0/OpenWhisper.dmg" length="2067703" type="application/octet-stream" sparkle:edSignature="nMN6AG1BRIKt+aMWv3ogJoeu/KhC+3tvxhsh0AjN3lQ4LWrJ+AxFJY5A7hMXI3IYjjCmCm74KccpnR2l29reAQ==" />
+    </item>
+    <item>
       <title>Version 0.2.0</title>
       <pubDate>Fri, 13 Feb 2026 14:13:11 -0500</pubDate>
       <sparkle:version>2</sparkle:version>
