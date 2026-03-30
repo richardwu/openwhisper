@@ -16,7 +16,7 @@ packages:
     from: "2.4.0"
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
-    from: "2.8.1"
+    exactVersion: "2.8.1"
 
 targets:
   OpenWhisper:
