@@ -144,7 +144,8 @@ final class AppState {
             // let prompt = systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
             let text = try await transcriptionService.transcribe(
                 audioFrames: samples,
-                modelURL: modelURL
+                modelURL: modelURL,
+                language: modelManager.selectedLanguage
             )
 
             if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

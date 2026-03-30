@@ -5,6 +5,7 @@ import SwiftWhisper
 final class TranscriptionService {
     private var whisperInstance: Whisper?
     private var loadedModelURL: URL?
+    private var loadedLanguage: WhisperLanguage?
     private var promptPointer: UnsafeMutablePointer<CChar>?
 
     deinit {
@@ -13,8 +14,13 @@ final class TranscriptionService {
         }
     }
 
-    func transcribe(audioFrames: [Float], modelURL: URL, initialPrompt: String? = nil) async throws -> String {
-        let whisper = try getOrCreateWhisper(modelURL: modelURL)
+    func transcribe(
+        audioFrames: [Float],
+        modelURL: URL,
+        language: WhisperLanguage,
+        initialPrompt: String? = nil
+    ) async throws -> String {
+        let whisper = try getOrCreateWhisper(modelURL: modelURL, language: language)
         updateInitialPrompt(initialPrompt, on: whisper.params)
         let segments = try await whisper.transcribe(audioFrames: audioFrames)
         let rawText = segments.map(\.text).joined()
@@ -62,17 +68,18 @@ final class TranscriptionService {
         return result
     }
 
-    private func getOrCreateWhisper(modelURL: URL) throws -> Whisper {
-        if let whisperInstance, loadedModelURL == modelURL {
+    private func getOrCreateWhisper(modelURL: URL, language: WhisperLanguage) throws -> Whisper {
+        if let whisperInstance, loadedModelURL == modelURL, loadedLanguage == language {
             return whisperInstance
         }
 
         let params = WhisperParams(strategy: .greedy)
-        params.language = .english
+        params.language = language
 
         let whisper = Whisper(fromFileURL: modelURL, withParams: params)
         self.whisperInstance = whisper
         self.loadedModelURL = modelURL
+        self.loadedLanguage = language
         return whisper
     }
 }
