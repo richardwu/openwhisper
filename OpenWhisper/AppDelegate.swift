@@ -31,14 +31,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func windowDidClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow,
               !(window is NSPanel),
-              window.title == "OpenWhisper" || window.identifier?.rawValue == "main"
+              AppIdentity.isMainWindow(window)
         else { return }
 
         // Short delay to let the window fully close
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             let hasVisibleMainWindow = NSApplication.shared.windows.contains {
-                !($0 is NSPanel) && $0.isVisible &&
-                ($0.title == "OpenWhisper" || $0.identifier?.rawValue == "main")
+                !($0 is NSPanel) && $0.isVisible && AppIdentity.isMainWindow($0)
             }
             if !hasVisibleMainWindow {
                 NSApp.setActivationPolicy(.accessory)
@@ -49,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func windowDidBecomeKey(_ notification: Notification) {
         guard let window = notification.object as? NSWindow,
               !(window is NSPanel),
-              window.title == "OpenWhisper" || window.identifier?.rawValue == "main"
+              AppIdentity.isMainWindow(window)
         else { return }
         NSApp.setActivationPolicy(.regular)
     }

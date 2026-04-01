@@ -105,8 +105,7 @@ final class AppState {
         NSApp.setActivationPolicy(.regular)
         NSApplication.shared.activate(ignoringOtherApps: true)
         for window in NSApplication.shared.windows {
-            if window.identifier?.rawValue == "main" ||
-               window.title == "OpenWhisper" {
+            if AppIdentity.isMainWindow(window) {
                 window.makeKeyAndOrderFront(nil)
                 return
             }
