@@ -1,5 +1,6 @@
 import SwiftUI
 import KeyboardShortcuts
+import SwiftWhisper
 
 struct SettingsTabView: View {
     let appState: AppState
@@ -39,6 +40,15 @@ struct SettingsTabView: View {
                 )) {
                     ForEach(WhisperModel.allCases, id: \.self) { model in
                         Text(model.displayName).tag(model)
+                    }
+                }
+
+                Picker("Language", selection: Binding(
+                    get: { appState.modelManager.selectedLanguage },
+                    set: { appState.modelManager.selectedLanguage = $0 }
+                )) {
+                    ForEach(languageOptions, id: \.self) { language in
+                        Text(language.settingsDisplayName).tag(language)
                     }
                 }
 
@@ -105,5 +115,21 @@ struct SettingsTabView: View {
             accessibilityGranted = Permissions.isAccessibilityGranted
             // promptText = appState.systemPrompt
         }
+    }
+
+    private var languageOptions: [WhisperLanguage] {
+        [.auto] + WhisperLanguage.allCases.filter { $0 != .auto }
+    }
+}
+
+private extension WhisperLanguage {
+    var settingsDisplayName: String {
+        if self == .auto {
+            return "Auto"
+        }
+
+        return String(describing: self)
+            .replacingOccurrences(of: "_", with: " ")
+            .localizedCapitalized
     }
 }

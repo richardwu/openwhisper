@@ -10,7 +10,7 @@ struct OpenWhisperApp: App {
     )
 
     var body: some Scene {
-        Window("OpenWhisper", id: "main") {
+        Window(AppIdentity.displayName, id: AppIdentity.mainWindowID) {
             MainWindowView(appState: appState)
         }
         .defaultSize(width: 620, height: 525)
