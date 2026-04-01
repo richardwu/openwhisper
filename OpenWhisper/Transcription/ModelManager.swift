@@ -1,4 +1,5 @@
 import Foundation
+import os
 import SwiftWhisper
 
 enum WhisperModel: String, CaseIterable {
@@ -94,7 +95,10 @@ final class ModelManager {
         self.selectedModel = WhisperModel(rawValue: storedModel) ?? .small
         self.selectedLanguage = WhisperLanguage(rawValue: storedLanguage) ?? .auto
 
-        migrateToMultilingualModelsIfNeeded(using: defaults)
+        let modelsDir = modelsDirectory
+        Task.detached(priority: .background) {
+            Self.migrateToMultilingualModelsIfNeeded(using: defaults, modelsDirectory: modelsDir)
+        }
     }
 
     func ensureModelAvailable() {
@@ -194,24 +198,31 @@ final class ModelManager {
         }
     }
 
-    private func migrateToMultilingualModelsIfNeeded(using defaults: UserDefaults) {
+    private static let logger = Logger(subsystem: "com.openwhisper.OpenWhisper", category: "ModelManager")
+
+    private nonisolated static func migrateToMultilingualModelsIfNeeded(using defaults: UserDefaults, modelsDirectory: URL?) {
         guard !defaults.bool(forKey: DefaultsKey.didMigrateToMultilingual) else { return }
 
-        defer {
+        guard let modelsDirectory else {
             defaults.set(true, forKey: DefaultsKey.didMigrateToMultilingual)
+            return
         }
 
-        guard let modelsDirectory else { return }
-
-        for legacyFileName in Self.legacyEnglishModelFileNames {
+        var allSucceeded = true
+        for legacyFileName in legacyEnglishModelFileNames {
             let legacyURL = modelsDirectory.appendingPathComponent(legacyFileName)
             guard FileManager.default.fileExists(atPath: legacyURL.path) else { continue }
 
             do {
                 try FileManager.default.removeItem(at: legacyURL)
             } catch {
-                errorMessage = "Could not clean up old model files: \(error.localizedDescription)"
+                logger.error("Could not clean up legacy model \(legacyFileName): \(error.localizedDescription)")
+                allSucceeded = false
             }
+        }
+
+        if allSucceeded {
+            defaults.set(true, forKey: DefaultsKey.didMigrateToMultilingual)
         }
     }
 }

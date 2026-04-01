@@ -4,7 +4,7 @@ enum AppIdentity {
     static let mainWindowID = "main"
     private static let fallbackName = "OpenWhisper"
 
-    static var displayName: String {
+    static let displayName: String = {
         if let displayName = Bundle.main.object(
             forInfoDictionaryKey: "CFBundleDisplayName"
         ) as? String, !displayName.isEmpty {
@@ -18,7 +18,7 @@ enum AppIdentity {
         }
 
         return fallbackName
-    }
+    }()
 
     static func isMainWindow(_ window: NSWindow) -> Bool {
         window.identifier?.rawValue == mainWindowID
