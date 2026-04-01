@@ -57,7 +57,7 @@ echo "==> Generating Xcode project..."
 xcodegen generate
 
 echo "==> Archiving Release build..."
-sudo rm -rf "$BUILD_DIR"
+rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
 xcodebuild archive \
