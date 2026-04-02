@@ -110,10 +110,12 @@ final class RealTranscriptionTests: XCTestCase {
     func testBackgroundNoiseProducesEmptyOrMinimalOutput() async throws {
         let samples = try loadWAVSamples(named: "background-noise")
         let text = try await service.transcribe(audioFrames: samples, modelURL: modelURL)
-        // Background noise should produce empty or very short output
+        // Background noise should produce empty or very short output (< 10 chars).
+        // The transcription filter strips punctuation-only and hallucinated phrases,
+        // so any residual text should be negligible.
         XCTAssertTrue(
-            text.count < 20,
-            "Expected minimal output for background noise, got: '\(text)'"
+            text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || text.count < 10,
+            "Expected empty or minimal output for background noise, got: '\(text)'"
         )
     }
 
@@ -142,6 +144,13 @@ final class RealTranscriptionTests: XCTestCase {
     }
 
     /// Full pipeline: real transcription → AppState → verify paste, history, status footer, overlay.
+    ///
+    /// Note: This test transcribes audio with the real Whisper model, then feeds the result into
+    /// AppState via a stub TranscriptionService. This validates that real model output flows correctly
+    /// through the state machine (paste, history, status, overlay), but does not exercise the
+    /// audio→transcription→AppState handoff atomically. The stub approach avoids flakiness from
+    /// microphone recording in CI while still catching regressions in both transcription quality
+    /// and state management.
     func testEnglishE2ETest1FullPipeline() async throws {
         // 1. Transcribe the m4a with the real model
         let samples = try loadAudioSamples(named: "english-e2e-test-1", ext: "m4a")
