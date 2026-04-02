@@ -1,4 +1,6 @@
 import Foundation
+import os
+import SwiftWhisper
 
 enum WhisperModel: String, CaseIterable {
     case base
@@ -7,9 +9,9 @@ enum WhisperModel: String, CaseIterable {
 
     var fileName: String {
         switch self {
-        case .base:   return "ggml-base.en.bin"
-        case .small:  return "ggml-small.en-q5_1.bin"
-        case .medium: return "ggml-medium.en-q5_0.bin"
+        case .base:   return "ggml-base.bin"
+        case .small:  return "ggml-small-q5_1.bin"
+        case .medium: return "ggml-medium-q5_0.bin"
         }
     }
 
@@ -20,9 +22,9 @@ enum WhisperModel: String, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .base:   return "Base (142 MB, very fast)"
-        case .small:  return "Small (181 MB, fast)"
-        case .medium: return "Medium (514 MB, not as fast)"
+        case .base:   return "Base (148 MB, very fast)"
+        case .small:  return "Small (163 MB, fast)"
+        case .medium: return "Medium (568 MB, not as fast)"
         }
     }
 }
@@ -39,6 +41,19 @@ final class ModelManager {
         case fixedPath(URL)
     }
 
+    private enum DefaultsKey {
+        static let selectedModel = "selectedModel"
+        static let selectedLanguage = "selectedLanguage"
+        static let didMigrateToMultilingual = "didMigrateToMultilingual"
+    }
+
+    private static let legacyEnglishModelFileNames = [
+        "ggml-base.en.bin",
+        "ggml-small.en-q5_1.bin",
+        "ggml-medium.en-q5_0.bin",
+    ]
+
+
     var isDownloading = false
     var downloadProgress: Double = 0
     var errorMessage: String?
@@ -50,7 +65,13 @@ final class ModelManager {
 
     var selectedModel: WhisperModel {
         didSet {
-            defaults.set(selectedModel.rawValue, forKey: "selectedModel")
+            defaults.set(selectedModel.rawValue, forKey: DefaultsKey.selectedModel)
+        }
+    }
+
+    var selectedLanguage: WhisperLanguage {
+        didSet {
+            defaults.set(selectedLanguage.rawValue, forKey: DefaultsKey.selectedLanguage)
         }
     }
 
@@ -98,8 +119,11 @@ final class ModelManager {
     init(mode: Mode = .live, defaults: UserDefaults = .standard) {
         self.mode = mode
         self.defaults = defaults
-        let stored = defaults.string(forKey: "selectedModel") ?? ""
-        self.selectedModel = WhisperModel(rawValue: stored) ?? .small
+        let storedModel = defaults.string(forKey: DefaultsKey.selectedModel) ?? ""
+        let storedLanguage = defaults.string(forKey: DefaultsKey.selectedLanguage) ?? ""
+
+        self.selectedModel = WhisperModel(rawValue: storedModel) ?? .small
+        self.selectedLanguage = WhisperLanguage(rawValue: storedLanguage) ?? .auto
 
         // Apply test mode initial state
         switch mode {
@@ -108,6 +132,11 @@ final class ModelManager {
             self.downloadProgress = progress
         case .failed(let message):
             self.errorMessage = message
+        case .live:
+            let modelsDir = modelsDirectory
+            Task.detached(priority: .background) {
+                Self.migrateToMultilingualModelsIfNeeded(using: defaults, modelsDirectory: modelsDir)
+            }
         default:
             break
         }
@@ -210,6 +239,34 @@ final class ModelManager {
             guard self.downloadGeneration == generation else { return }
             isDownloading = false
             errorMessage = "Download failed: \(error.localizedDescription)"
+        }
+    }
+
+    private static let logger = Logger(subsystem: "com.openwhisper.OpenWhisper", category: "ModelManager")
+
+    private nonisolated static func migrateToMultilingualModelsIfNeeded(using defaults: UserDefaults, modelsDirectory: URL?) {
+        guard !defaults.bool(forKey: DefaultsKey.didMigrateToMultilingual) else { return }
+
+        guard let modelsDirectory else {
+            defaults.set(true, forKey: DefaultsKey.didMigrateToMultilingual)
+            return
+        }
+
+        var allSucceeded = true
+        for legacyFileName in legacyEnglishModelFileNames {
+            let legacyURL = modelsDirectory.appendingPathComponent(legacyFileName)
+            guard FileManager.default.fileExists(atPath: legacyURL.path) else { continue }
+
+            do {
+                try FileManager.default.removeItem(at: legacyURL)
+            } catch {
+                logger.error("Could not clean up legacy model \(legacyFileName): \(error.localizedDescription)")
+                allSucceeded = false
+            }
+        }
+
+        if allSucceeded {
+            defaults.set(true, forKey: DefaultsKey.didMigrateToMultilingual)
         }
     }
 }

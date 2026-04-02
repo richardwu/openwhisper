@@ -12,6 +12,7 @@ Download the latest `.dmg` from the [Releases](https://github.com/richardwu/open
 
 - **Fully local & private** — audio never leaves your machine
 - **whisper.cpp** via [SwiftWhisper](https://github.com/exPHAT/SwiftWhisper) for fast, accurate transcription
+- **100 language options** — includes automatic language detection plus 99 explicit language selections
 - **Global hotkey** — start/stop recording from anywhere
 - **Auto-paste** — transcribed text is pasted into the active app automatically
 - **Transcription history** — review and copy past transcriptions
@@ -31,7 +32,7 @@ git clone https://github.com/richardwu/openwhisper
 cd openwhisper
 xcodegen generate
 xcodebuild -scheme OpenWhisper -configuration Debug -derivedDataPath .build build
-open .build/Build/Products/Debug/OpenWhisper.app
+open ".build/Build/Products/Debug/OpenWhisper (Dev).app"
 ```
 
 To sign with your own Apple Development certificate (persists permissions across rebuilds):
@@ -41,6 +42,8 @@ xcodebuild -scheme OpenWhisper -configuration Debug -derivedDataPath .build buil
   CODE_SIGN_IDENTITY="Apple Development" \
   CODE_SIGN_STYLE=Manual
 ```
+
+`Debug` builds use the bundle ID `com.openwhisper.OpenWhisper.dev` and appear as `OpenWhisper (Dev)`, so they can coexist with the installed production app and keep separate TCC permissions/user defaults.
 
 On first launch of a dev build the app will download the Whisper model (~148 MB) if not already bundled. You'll also need to grant:
 

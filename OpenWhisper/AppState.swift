@@ -120,8 +120,7 @@ final class AppState {
         NSApp.setActivationPolicy(.regular)
         NSApplication.shared.activate(ignoringOtherApps: true)
         for window in NSApplication.shared.windows {
-            if window.identifier?.rawValue == "main" ||
-               window.title == "OpenWhisper" {
+            if AppIdentity.isMainWindow(window) {
                 window.makeKeyAndOrderFront(nil)
                 return
             }
@@ -157,7 +156,8 @@ final class AppState {
         do {
             let text = try await transcriptionService.transcribe(
                 audioFrames: samples,
-                modelURL: modelURL
+                modelURL: modelURL,
+                language: modelManager.selectedLanguage
             )
 
             if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

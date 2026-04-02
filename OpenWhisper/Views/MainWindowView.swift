@@ -110,7 +110,7 @@ struct MainWindowView: View {
                         .font(.system(size: 36))
                         .foregroundStyle(.tint)
 
-                    Text("OpenWhisper")
+                    Text(AppIdentity.displayName)
                         .font(.title2)
                         .fontWeight(.bold)
 

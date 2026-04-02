@@ -35,7 +35,7 @@ struct MenuBarMenuView: View {
 
         Divider()
 
-        Button("Quit OpenWhisper") {
+        Button("Quit \(AppIdentity.displayName)") {
             NSApplication.shared.terminate(nil)
         }
     }

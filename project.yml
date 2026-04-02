@@ -16,7 +16,7 @@ packages:
     from: "2.4.0"
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
-    from: "2.8.1"
+    exactVersion: "2.8.1"
 
 targets:
   OpenWhisper:
@@ -31,8 +31,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.openwhisper.OpenWhisper
         PRODUCT_NAME: OpenWhisper
-        MARKETING_VERSION: "0.3.0"
-        CURRENT_PROJECT_VERSION: "3"
+        MARKETING_VERSION: "0.4.0"
+        CURRENT_PROJECT_VERSION: "4"
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
@@ -40,6 +40,11 @@ targets:
         CODE_SIGN_IDENTITY: "-"
         GENERATE_INFOPLIST_FILE: true
         ASSETCATALOG_COMPILER_APPICON_NAME: ""
+      configs:
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: com.openwhisper.OpenWhisper.dev
+          PRODUCT_NAME: "OpenWhisper (Dev)"
+          PRODUCT_MODULE_NAME: OpenWhisper
     dependencies:
       - package: SwiftWhisper
       - package: KeyboardShortcuts
@@ -47,6 +52,7 @@ targets:
     info:
       path: OpenWhisper/Info.plist
       properties:
+        CFBundleDisplayName: $(PRODUCT_NAME)
         CFBundleIconFile: AppIcon
         LSUIElement: false
         NSMicrophoneUsageDescription: "OpenWhisper needs microphone access to record your voice for transcription."
@@ -69,6 +75,9 @@ targets:
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         GENERATE_INFOPLIST_FILE: true
+      configs:
+        Debug:
+          TEST_HOST: "$(BUILT_PRODUCTS_DIR)/OpenWhisper (Dev).app/Contents/MacOS/OpenWhisper (Dev)"
     dependencies:
       - target: OpenWhisper
 
@@ -85,6 +94,9 @@ targets:
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         GENERATE_INFOPLIST_FILE: true
+      configs:
+        Debug:
+          TEST_HOST: "$(BUILT_PRODUCTS_DIR)/OpenWhisper (Dev).app/Contents/MacOS/OpenWhisper (Dev)"
     dependencies:
       - target: OpenWhisper
 
@@ -101,3 +113,20 @@ targets:
         TEST_TARGET_NAME: OpenWhisper
     dependencies:
       - target: OpenWhisper
+
+schemes:
+  OpenWhisper:
+    build:
+      targets:
+        OpenWhisper: all
+        OpenWhisperTests: [test]
+        OpenWhisperTranscriptionTests: [test]
+        OpenWhisperUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - OpenWhisperTests
+        - OpenWhisperTranscriptionTests
+        - OpenWhisperUITests

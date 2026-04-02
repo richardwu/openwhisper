@@ -51,13 +51,23 @@ if [ -z "$SPARKLE_PUBLIC_KEY" ]; then
 fi
 echo "    Sparkle public key: ${SPARKLE_PUBLIC_KEY:0:20}..."
 
+# --- Bump versions in project.yml ---
+echo ""
+echo "==> Bumping versions in project.yml..."
+OLD_BUILD=$(grep 'CURRENT_PROJECT_VERSION' project.yml | head -1 | sed 's/.*: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/')
+NEW_BUILD=$((OLD_BUILD + 1))
+sed -i '' "s/CURRENT_PROJECT_VERSION: \"$OLD_BUILD\"/CURRENT_PROJECT_VERSION: \"$NEW_BUILD\"/" project.yml
+sed -i '' "s/MARKETING_VERSION: \"[^\"]*\"/MARKETING_VERSION: \"$VERSION\"/" project.yml
+echo "    MARKETING_VERSION: $VERSION"
+echo "    CURRENT_PROJECT_VERSION: $OLD_BUILD → $NEW_BUILD"
+
 # --- Clean and build ---
 echo ""
 echo "==> Generating Xcode project..."
 xcodegen generate
 
 echo "==> Archiving Release build..."
-sudo rm -rf "$BUILD_DIR"
+rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
 xcodebuild archive \
