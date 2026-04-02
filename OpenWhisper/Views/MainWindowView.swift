@@ -18,8 +18,8 @@ enum AppTab: String, CaseIterable {
 struct MainWindowView: View {
     let appState: AppState
     @State private var selectedTab: AppTab = .home
-    @State private var micAuthorized = Permissions.isMicrophoneAuthorized
-    @State private var accessibilityGranted = Permissions.isAccessibilityGranted
+    @State private var micAuthorized = false
+    @State private var accessibilityGranted = false
 
     private let permissionTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
@@ -79,13 +79,16 @@ struct MainWindowView: View {
         }
         .frame(minWidth: 580, maxWidth: 700, minHeight: 420, maxHeight: 640)
         .onReceive(permissionTimer) { _ in
-            micAuthorized = Permissions.isMicrophoneAuthorized
-            accessibilityGranted = Permissions.isAccessibilityGranted
+            refreshPermissions()
         }
         .onAppear {
-            micAuthorized = Permissions.isMicrophoneAuthorized
-            accessibilityGranted = Permissions.isAccessibilityGranted
+            refreshPermissions()
         }
+    }
+
+    private func refreshPermissions() {
+        micAuthorized = appState.permissionsClient.isMicrophoneAuthorized
+        accessibilityGranted = appState.permissionsClient.isAccessibilityGranted
     }
 
     private var statusColor: Color {
@@ -128,7 +131,7 @@ struct MainWindowView: View {
                                 description: "Microphone access is required to record your voice.",
                                 buttonLabel: "Grant Microphone Access"
                             ) {
-                                Permissions.requestMicrophone()
+                                appState.permissionsClient.requestMicrophone()
                             }
                         }
 
@@ -139,7 +142,7 @@ struct MainWindowView: View {
                                 description: "Accessibility access is required to paste transcribed text and for the global hotkey to work in all apps.",
                                 buttonLabel: "Open Accessibility Settings"
                             ) {
-                                Permissions.openAccessibilitySettings()
+                                appState.permissionsClient.openAccessibilitySettings()
                             }
                         }
                     }

@@ -18,8 +18,10 @@ final class HistoryStore {
     private(set) var entries: [TranscriptionEntry] = []
 
     private static let storageKey = "transcriptionHistory"
+    private let defaults: UserDefaults
 
-    init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         load()
     }
 
@@ -41,12 +43,12 @@ final class HistoryStore {
 
     private func save() {
         if let data = try? JSONEncoder().encode(entries) {
-            UserDefaults.standard.set(data, forKey: Self.storageKey)
+            defaults.set(data, forKey: Self.storageKey)
         }
     }
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: Self.storageKey),
+        guard let data = defaults.data(forKey: Self.storageKey),
               let decoded = try? JSONDecoder().decode([TranscriptionEntry].self, from: data)
         else { return }
         entries = decoded
