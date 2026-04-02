@@ -37,11 +37,12 @@ struct AppEnvironment {
         )
     }
 
-    static func test(scenario: String, defaults: UserDefaults = UserDefaults(suiteName: UUID().uuidString)!) -> AppEnvironment {
+    static func test(scenario: String, suiteName: String = UUID().uuidString) -> AppEnvironment {
+        let defaults = UserDefaults(suiteName: suiteName)!
         let config = LaunchConfiguration(
             isTestMode: true,
             testScenario: scenario,
-            defaultsSuiteName: defaults.volatileDomainNames.first,
+            defaultsSuiteName: suiteName,
             disableSparkle: true,
             disableHotkeys: true,
             modelPath: nil

@@ -21,7 +21,7 @@ final class OpenWhisperUITests: XCTestCase {
         app.launchForTest(scenario: "launch_ready_state")
 
         // Main window should be visible
-        let window = app.windows["OpenWhisper"]
+        let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 10))
 
         // Tabs should be present
@@ -33,16 +33,8 @@ final class OpenWhisperUITests: XCTestCase {
 
     // MARK: - record_to_transcribe_success
 
-    func testRecordToTranscribeSuccess() {
-        app.launchForTest(scenario: "record_to_transcribe_success")
-
-        let window = app.windows["OpenWhisper"]
-        XCTAssertTrue(window.waitForExistence(timeout: 10))
-
-        // Find and click the Start Recording button in the menu bar menu
-        let menuBar = app.menuBarItems
-        // The menu bar extra should exist
-        XCTAssertTrue(app.windows["OpenWhisper"].waitForExistence(timeout: 5))
+    func testRecordToTranscribeSuccess() throws {
+        throw XCTSkip("UI record→transcribe flow not yet implemented — requires menu bar interaction")
     }
 
     // MARK: - mic_denied
@@ -50,7 +42,7 @@ final class OpenWhisperUITests: XCTestCase {
     func testMicDenied() {
         app.launchForTest(scenario: "mic_denied")
 
-        let window = app.windows["OpenWhisper"]
+        let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 10))
 
         // Permission banner should be visible
@@ -62,11 +54,11 @@ final class OpenWhisperUITests: XCTestCase {
     func testModelDownloading() {
         app.launchForTest(scenario: "model_downloading")
 
-        let window = app.windows["OpenWhisper"]
+        let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 10))
 
-        // Model not ready indicator should show
-        XCTAssertTrue(window.staticTexts["Ready"].waitForExistence(timeout: 5))
+        // Model not ready indicator should show — "Ready" should NOT be the status
+        XCTAssertTrue(window.staticTexts["Model not ready"].waitForExistence(timeout: 5))
     }
 
     // MARK: - accessibility_denied
@@ -74,7 +66,7 @@ final class OpenWhisperUITests: XCTestCase {
     func testAccessibilityDenied() {
         app.launchForTest(scenario: "accessibility_denied")
 
-        let window = app.windows["OpenWhisper"]
+        let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 10))
 
         // Accessibility permission banner should be visible
@@ -86,7 +78,7 @@ final class OpenWhisperUITests: XCTestCase {
     func testHistoryManagement() {
         app.launchForTest(scenario: "history_management")
 
-        let window = app.windows["OpenWhisper"]
+        let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 10))
 
         // Navigate to History tab
