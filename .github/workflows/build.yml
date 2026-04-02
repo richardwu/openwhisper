@@ -80,22 +80,22 @@ jobs:
         id: cache-model
         uses: actions/cache@v4
         with:
-          path: .build/models/ggml-base.en.bin
-          key: whisper-model-base-en-v1
+          path: .build/models/ggml-base.bin
+          key: whisper-model-base-v1
 
       - name: Download Whisper model
         if: steps.cache-model.outputs.cache-hit != 'true'
         run: |
           mkdir -p .build/models
-          curl -L -o .build/models/ggml-base.en.bin \
-            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"
+          curl -L -o .build/models/ggml-base.bin \
+            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
 
       - name: Generate Xcode project
         run: xcodegen generate
 
       - name: Run real transcription tests
         env:
-          OPENWHISPER_MODEL_PATH: ${{ github.workspace }}/.build/models/ggml-base.en.bin
+          OPENWHISPER_MODEL_PATH: ${{ github.workspace }}/.build/models/ggml-base.bin
         run: |
           xcodebuild test \
             -scheme OpenWhisper \

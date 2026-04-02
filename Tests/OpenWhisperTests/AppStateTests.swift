@@ -4,10 +4,19 @@ import XCTest
 @MainActor
 final class AppStateTests: XCTestCase {
 
+    private var suiteName: String = ""
+
     private func makeAppState(scenario: String) -> AppState {
-        let defaults = UserDefaults(suiteName: "com.openwhisper.test.\(UUID().uuidString)")!
-        let env = AppEnvironment.test(scenario: scenario, defaults: defaults)
+        suiteName = "com.openwhisper.test.\(UUID().uuidString)"
+        let env = AppEnvironment.test(scenario: scenario, suiteName: suiteName)
         return AppState(environment: env)
+    }
+
+    override func tearDown() {
+        if !suiteName.isEmpty {
+            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+        }
+        super.tearDown()
     }
 
     // MARK: - Launch Ready State

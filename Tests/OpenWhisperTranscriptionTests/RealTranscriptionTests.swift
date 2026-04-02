@@ -39,11 +39,7 @@ final class RealTranscriptionTests: XCTestCase {
     // MARK: - Helpers
 
     private func loadWAVSamples(named name: String) throws -> [Float] {
-        let bundle = Bundle(for: type(of: self))
-        guard let url = bundle.url(forResource: name, withExtension: "wav", subdirectory: "Fixtures/Audio") else {
-            throw XCTSkip("Fixture \(name).wav not found in test bundle")
-        }
-        return try readWAVFloat32(url: url)
+        return try loadAudioSamples(named: name, ext: "wav")
     }
 
     private func loadAudioSamples(named name: String, ext: String) throws -> [Float] {
@@ -98,24 +94,6 @@ final class RealTranscriptionTests: XCTestCase {
         return Array(UnsafeBufferPointer(start: channelData[0], count: frameCount))
     }
 
-    /// Reads a 16kHz mono 16-bit PCM WAV file and returns Float32 samples normalized to [-1, 1].
-    private func readWAVFloat32(url: URL) throws -> [Float] {
-        let data = try Data(contentsOf: url)
-        // Skip 44-byte WAV header
-        guard data.count > 44 else {
-            throw NSError(domain: "WAV", code: 1, userInfo: [NSLocalizedDescriptionKey: "WAV file too small"])
-        }
-        let pcmData = data.subdata(in: 44..<data.count)
-        let sampleCount = pcmData.count / 2
-        var samples = [Float](repeating: 0, count: sampleCount)
-        pcmData.withUnsafeBytes { raw in
-            let int16Ptr = raw.bindMemory(to: Int16.self)
-            for i in 0..<sampleCount {
-                samples[i] = Float(int16Ptr[i]) / 32768.0
-            }
-        }
-        return samples
-    }
 
     // MARK: - Tests
 
