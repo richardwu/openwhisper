@@ -57,8 +57,8 @@ final class OpenWhisperUITests: XCTestCase {
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 10))
 
-        // Model not ready indicator should show — "Ready" should NOT be the status
-        XCTAssertTrue(window.staticTexts["Model not ready"].waitForExistence(timeout: 5))
+        // Model is downloading at 45% — progress indicator should be visible
+        XCTAssertTrue(window.staticTexts["45%"].waitForExistence(timeout: 5))
     }
 
     // MARK: - accessibility_denied
