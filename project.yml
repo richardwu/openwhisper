@@ -58,3 +58,46 @@ targets:
       path: OpenWhisper/OpenWhisper.entitlements
       properties:
         com.apple.security.device.audio-input: true
+
+  OpenWhisperTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/OpenWhisperTests
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        GENERATE_INFOPLIST_FILE: true
+    dependencies:
+      - target: OpenWhisper
+
+  OpenWhisperTranscriptionTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/OpenWhisperTranscriptionTests
+      - path: Tests/Fixtures
+        buildPhase: resources
+        type: folder
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        GENERATE_INFOPLIST_FILE: true
+    dependencies:
+      - target: OpenWhisper
+
+  OpenWhisperUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: Tests/OpenWhisperUITests
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        GENERATE_INFOPLIST_FILE: true
+        TEST_TARGET_NAME: OpenWhisper
+    dependencies:
+      - target: OpenWhisper

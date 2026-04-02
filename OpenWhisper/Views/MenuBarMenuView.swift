@@ -4,7 +4,7 @@ import SwiftUI
 
 struct MenuBarMenuView: View {
     let appState: AppState
-    let updater: SPUUpdater
+    let updater: SPUUpdater?
 
     var body: some View {
         if appState.isRecording {
@@ -23,8 +23,10 @@ struct MenuBarMenuView: View {
 
         Divider()
 
-        Button("Check for Updates...") {
-            updater.checkForUpdates()
+        if let updater {
+            Button("Check for Updates...") {
+                updater.checkForUpdates()
+            }
         }
 
         Button("Show Main Window") {

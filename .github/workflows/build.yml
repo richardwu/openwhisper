@@ -1,4 +1,4 @@
-name: Build
+name: Build & Test
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  build:
+  build-and-unit:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -19,6 +19,95 @@ jobs:
         run: xcodegen generate
 
       - name: Build
+        run: xcodebuild -scheme OpenWhisper -configuration Debug -derivedDataPath .build build CODE_SIGN_IDENTITY="-"
+
+      - name: Run unit tests
+        run: |
+          xcodebuild test \
+            -scheme OpenWhisper \
+            -only-testing:OpenWhisperTests \
+            -destination 'platform=macOS' \
+            -derivedDataPath .build \
+            -resultBundlePath .build/xcresult/unit.xcresult \
+            CODE_SIGN_IDENTITY="-"
+
+      - name: Upload unit test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: .build/xcresult/unit.xcresult
+
+  ui-e2e:
+    runs-on: macos-15
+    needs: build-and-unit
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Run UI E2E tests
+        run: |
+          xcodebuild test \
+            -scheme OpenWhisper \
+            -only-testing:OpenWhisperUITests \
+            -destination 'platform=macOS' \
+            -derivedDataPath .build \
+            -resultBundlePath .build/xcresult/ui-e2e.xcresult \
+            CODE_SIGN_IDENTITY="-"
+
+      - name: Upload UI test results and screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-e2e-test-results
+          path: .build/xcresult/ui-e2e.xcresult
+
+  transcription-real:
+    runs-on: macos-15
+    needs: build-and-unit
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Cache Whisper model
+        id: cache-model
+        uses: actions/cache@v4
+        with:
+          path: .build/models/ggml-base.en.bin
+          key: whisper-model-base-en-v1
+
+      - name: Download Whisper model
+        if: steps.cache-model.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p .build/models
+          curl -L -o .build/models/ggml-base.en.bin \
+            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Run real transcription tests
         env:
-          SKIP_MODEL_DOWNLOAD: "1"
-        run: xcodebuild -scheme OpenWhisper -configuration Debug -derivedDataPath .build build
+          OPENWHISPER_MODEL_PATH: ${{ github.workspace }}/.build/models/ggml-base.en.bin
+        run: |
+          xcodebuild test \
+            -scheme OpenWhisper \
+            -only-testing:OpenWhisperTranscriptionTests \
+            -destination 'platform=macOS' \
+            -derivedDataPath .build \
+            -resultBundlePath .build/xcresult/transcription-real.xcresult \
+            CODE_SIGN_IDENTITY="-"
+
+      - name: Upload transcription test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: transcription-test-results
+          path: .build/xcresult/transcription-real.xcresult
