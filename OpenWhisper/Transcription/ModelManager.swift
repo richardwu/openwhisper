@@ -32,6 +32,15 @@ enum WhisperModel: String, CaseIterable {
 @MainActor
 @Observable
 final class ModelManager {
+    enum Mode {
+        case live
+        case ready
+        case downloading(progress: Double)
+        case missing
+        case failed(message: String)
+        case fixedPath(URL)
+    }
+
     private enum DefaultsKey {
         static let selectedModel = "selectedModel"
         static let selectedLanguage = "selectedLanguage"
@@ -44,36 +53,56 @@ final class ModelManager {
         "ggml-medium.en-q5_0.bin",
     ]
 
+
     var isDownloading = false
     var downloadProgress: Double = 0
     var errorMessage: String?
 
     private var downloadTask: Task<Void, Never>?
     private var downloadGeneration: Int = 0
+    private let mode: Mode
+    private let defaults: UserDefaults
 
     var selectedModel: WhisperModel {
         didSet {
-            UserDefaults.standard.set(selectedModel.rawValue, forKey: DefaultsKey.selectedModel)
+            defaults.set(selectedModel.rawValue, forKey: DefaultsKey.selectedModel)
         }
     }
 
     var selectedLanguage: WhisperLanguage {
         didSet {
-            UserDefaults.standard.set(selectedLanguage.rawValue, forKey: DefaultsKey.selectedLanguage)
+            defaults.set(selectedLanguage.rawValue, forKey: DefaultsKey.selectedLanguage)
         }
     }
 
     var isModelReady: Bool {
-        modelFileURL != nil
+        switch mode {
+        case .ready, .fixedPath:
+            return true
+        case .downloading, .missing, .failed:
+            return false
+        case .live:
+            return modelFileURL != nil
+        }
     }
 
     var modelFileURL: URL? {
-        guard let dir = modelsDirectory else { return nil }
-        let path = dir.appendingPathComponent(selectedModel.fileName)
-        if FileManager.default.fileExists(atPath: path.path) {
-            return path
+        switch mode {
+        case .fixedPath(let url):
+            return url
+        case .ready:
+            // Return a sentinel URL for test mode — TranscriptionService stub won't use it
+            return URL(fileURLWithPath: "/tmp/test-model.bin")
+        case .downloading, .missing, .failed:
+            return nil
+        case .live:
+            guard let dir = modelsDirectory else { return nil }
+            let path = dir.appendingPathComponent(selectedModel.fileName)
+            if FileManager.default.fileExists(atPath: path.path) {
+                return path
+            }
+            return nil
         }
-        return nil
     }
 
     private var modelsDirectory: URL? {
@@ -87,27 +116,41 @@ final class ModelManager {
             .appendingPathComponent("Models")
     }
 
-    init() {
-        let defaults = UserDefaults.standard
+    init(mode: Mode = .live, defaults: UserDefaults = .standard) {
+        self.mode = mode
+        self.defaults = defaults
         let storedModel = defaults.string(forKey: DefaultsKey.selectedModel) ?? ""
         let storedLanguage = defaults.string(forKey: DefaultsKey.selectedLanguage) ?? ""
 
         self.selectedModel = WhisperModel(rawValue: storedModel) ?? .small
         self.selectedLanguage = WhisperLanguage(rawValue: storedLanguage) ?? .auto
 
-        let modelsDir = modelsDirectory
-        Task.detached(priority: .background) {
-            Self.migrateToMultilingualModelsIfNeeded(using: defaults, modelsDirectory: modelsDir)
+        // Apply test mode initial state
+        switch mode {
+        case .downloading(let progress):
+            self.isDownloading = true
+            self.downloadProgress = progress
+        case .failed(let message):
+            self.errorMessage = message
+        case .live:
+            let modelsDir = modelsDirectory
+            Task.detached(priority: .background) {
+                Self.migrateToMultilingualModelsIfNeeded(using: defaults, modelsDirectory: modelsDir)
+            }
+        default:
+            break
         }
     }
 
     func ensureModelAvailable() {
+        guard case .live = mode else { return }
         if !isModelReady {
             startDownload()
         }
     }
 
     func selectModel(_ model: WhisperModel) {
+        guard case .live = mode else { return }
         downloadTask?.cancel()
         downloadTask = nil
         downloadGeneration &+= 1
@@ -123,6 +166,7 @@ final class ModelManager {
     }
 
     func startDownload() {
+        guard case .live = mode else { return }
         downloadTask?.cancel()
         downloadTask = nil
         downloadGeneration &+= 1

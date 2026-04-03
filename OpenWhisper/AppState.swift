@@ -8,39 +8,51 @@ final class AppState {
     var statusMessage = "Ready"
     var isTranscribing = false
 
-    @ObservationIgnored
-    @AppStorage("systemPrompt") var systemPrompt: String = ""
-
-    let audioRecorder = AudioRecorder()
-    let transcriptionService = TranscriptionService()
-    let pasteService = PasteService()
-    let modelManager = ModelManager()
+    let audioRecorder: AudioRecorder
+    let transcriptionService: TranscriptionService
+    let pasteService: PasteService
+    let modelManager: ModelManager
     let overlayState = OverlayState()
-    let historyStore = HistoryStore()
+    let historyStore: HistoryStore
+    let permissionsClient: PermissionsClient
     private(set) var overlayController: OverlayController?
 
-    init() {
+    private let launchConfig: LaunchConfiguration
+
+    init(environment: AppEnvironment) {
+        self.audioRecorder = environment.audioRecorder
+        self.transcriptionService = environment.transcriptionService
+        self.pasteService = environment.pasteService
+        self.modelManager = environment.modelManager
+        self.historyStore = environment.historyStore
+        self.permissionsClient = environment.permissionsClient
+        self.launchConfig = environment.launchConfig
+
         // Create overlay controller after all properties are initialized
         overlayController = OverlayController(overlayState: overlayState, audioRecorder: audioRecorder)
 
-        KeyboardShortcuts.onKeyUp(for: .toggleRecording) { [weak self] in
-            guard let self else { return }
-            Task { @MainActor in
-                await self.toggleRecording()
+        if !launchConfig.disableHotkeys {
+            KeyboardShortcuts.onKeyUp(for: .toggleRecording) { [weak self] in
+                guard let self else { return }
+                Task { @MainActor in
+                    await self.toggleRecording()
+                }
             }
+
+            KeyboardShortcuts.onKeyUp(for: .cancelRecording) { [weak self] in
+                guard let self else { return }
+                Task { @MainActor in
+                    self.cancelRecording()
+                }
+            }
+
+            syncCancelRecordingHotkey()
         }
 
-        KeyboardShortcuts.onKeyUp(for: .cancelRecording) { [weak self] in
-            guard let self else { return }
-            Task { @MainActor in
-                self.cancelRecording()
-            }
+        // Auto-download model on first launch (skip in test mode)
+        if !launchConfig.isTestMode {
+            modelManager.ensureModelAvailable()
         }
-
-        syncCancelRecordingHotkey()
-
-        // Auto-download model on first launch
-        modelManager.ensureModelAvailable()
     }
 
     func toggleRecording() async {
@@ -82,9 +94,9 @@ final class AppState {
             return
         }
 
-        if !Permissions.isMicrophoneAuthorized {
+        if !permissionsClient.isMicrophoneAuthorized {
             statusMessage = "Microphone permission required"
-            Permissions.requestMicrophone()
+            permissionsClient.requestMicrophone()
             Self.showMainWindow()
             return
         }
@@ -139,8 +151,6 @@ final class AppState {
         overlayState.phase = .transcribing
 
         do {
-            // TODO: Re-enable system prompt once prompt quality is improved
-            // let prompt = systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
             let text = try await transcriptionService.transcribe(
                 audioFrames: samples,
                 modelURL: modelURL,
@@ -150,9 +160,25 @@ final class AppState {
             if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 statusMessage = "No speech detected"
             } else {
-                pasteService.paste(text: text)
+                // Always save to history so the user can retrieve the text later
                 historyStore.add(text: text)
-                statusMessage = "Pasted: \(String(text.prefix(50)))\(text.count > 50 ? "..." : "")"
+
+                if permissionsClient.isAccessibilityGranted {
+                    pasteService.paste(text: text)
+                    statusMessage = "Pasted: \(String(text.prefix(50)))\(text.count > 50 ? "..." : "")"
+                } else {
+                    statusMessage = "Accessibility permission required to paste (saved to history)"
+                    overlayState.phase = .accessibilityRequired
+                    overlayController?.show()
+                    isTranscribing = false
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                        guard self?.overlayState.phase == .accessibilityRequired else { return }
+                        self?.overlayState.phase = .hidden
+                        self?.overlayController?.dismiss()
+                    }
+                    return
+                }
             }
         } catch {
             statusMessage = "Transcription error: \(error.localizedDescription)"
@@ -164,6 +190,7 @@ final class AppState {
     }
 
     func syncCancelRecordingHotkey() {
+        guard !launchConfig.disableHotkeys else { return }
         if isRecording {
             KeyboardShortcuts.enable(.cancelRecording)
         } else {

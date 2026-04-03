@@ -3,7 +3,30 @@ import Carbon.HIToolbox
 
 @MainActor
 final class PasteService {
+    enum Mode {
+        case live
+        case spy
+    }
+
+    private let mode: Mode
+
+    /// In spy mode, records each pasted text for test assertions.
+    private(set) var pastedTexts: [String] = []
+
+    init(mode: Mode = .live) {
+        self.mode = mode
+    }
+
     func paste(text: String) {
+        switch mode {
+        case .live:
+            livePaste(text: text)
+        case .spy:
+            pastedTexts.append(text)
+        }
+    }
+
+    private func livePaste(text: String) {
         let pasteboard = NSPasteboard.general
 
         // Save current clipboard contents

@@ -4,16 +4,8 @@ import SwiftWhisper
 
 struct SettingsTabView: View {
     let appState: AppState
-    @State private var micAuthorized = Permissions.isMicrophoneAuthorized
-    @State private var accessibilityGranted = Permissions.isAccessibilityGranted
-
-    // TODO: Re-enable when system prompt UI is restored
-    // @State private var promptText: String = ""
-    // @State private var isSaving = false
-    // @State private var showSaved = false
-    // @State private var saveTask: Task<Void, Never>?
-    // @State private var hideSavedTask: Task<Void, Never>?
-    // private let maxPromptLength = 500
+    @State private var micAuthorized = false
+    @State private var accessibilityGranted = false
 
     private let permissionTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
@@ -27,11 +19,6 @@ struct SettingsTabView: View {
                     ShortcutRecorder(name: .cancelRecording)
                 }
             }
-
-            // TODO: Re-enable system prompt UI once prompt quality is improved
-            // Section("System Prompt") {
-            //     ...
-            // }
 
             Section("Model") {
                 Picker("Model", selection: Binding(
@@ -88,7 +75,7 @@ struct SettingsTabView: View {
                             .foregroundStyle(.green)
                     } else {
                         Button("Grant Access") {
-                            Permissions.requestMicrophone()
+                            appState.permissionsClient.requestMicrophone()
                         }
                     }
                 }
@@ -99,7 +86,7 @@ struct SettingsTabView: View {
                             .foregroundStyle(.green)
                     } else {
                         Button("Open Settings") {
-                            Permissions.openAccessibilitySettings()
+                            appState.permissionsClient.openAccessibilitySettings()
                         }
                     }
                 }
@@ -107,14 +94,16 @@ struct SettingsTabView: View {
         }
         .formStyle(.grouped)
         .onReceive(permissionTimer) { _ in
-            micAuthorized = Permissions.isMicrophoneAuthorized
-            accessibilityGranted = Permissions.isAccessibilityGranted
+            refreshPermissions()
         }
         .onAppear {
-            micAuthorized = Permissions.isMicrophoneAuthorized
-            accessibilityGranted = Permissions.isAccessibilityGranted
-            // promptText = appState.systemPrompt
+            refreshPermissions()
         }
+    }
+
+    private func refreshPermissions() {
+        micAuthorized = appState.permissionsClient.isMicrophoneAuthorized
+        accessibilityGranted = appState.permissionsClient.isAccessibilityGranted
     }
 
     private var languageOptions: [WhisperLanguage] {

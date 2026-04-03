@@ -74,12 +74,12 @@ struct SettingsView: View {
                 HStack {
                     Text("Microphone")
                     Spacer()
-                    if Permissions.isMicrophoneAuthorized {
+                    if appState.permissionsClient.isMicrophoneAuthorized {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                     } else {
                         Button("Request") {
-                            Permissions.requestMicrophone()
+                            appState.permissionsClient.requestMicrophone()
                         }
                     }
                 }
@@ -87,12 +87,12 @@ struct SettingsView: View {
                 HStack {
                     Text("Accessibility")
                     Spacer()
-                    if Permissions.isAccessibilityGranted {
+                    if appState.permissionsClient.isAccessibilityGranted {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                     } else {
                         Button("Open Settings") {
-                            Permissions.openAccessibilitySettings()
+                            appState.permissionsClient.openAccessibilitySettings()
                         }
                     }
                 }
