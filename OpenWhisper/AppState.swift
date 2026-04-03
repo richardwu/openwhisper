@@ -8,9 +8,6 @@ final class AppState {
     var statusMessage = "Ready"
     var isTranscribing = false
 
-    @ObservationIgnored
-    @AppStorage("systemPrompt") var systemPrompt: String = ""
-
     let audioRecorder: AudioRecorder
     let transcriptionService: TranscriptionService
     let pasteService: PasteService
@@ -163,13 +160,14 @@ final class AppState {
             if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 statusMessage = "No speech detected"
             } else {
-                // Check Accessibility before pasting
+                // Always save to history so the user can retrieve the text later
+                historyStore.add(text: text)
+
                 if permissionsClient.isAccessibilityGranted {
                     pasteService.paste(text: text)
-                    historyStore.add(text: text)
                     statusMessage = "Pasted: \(String(text.prefix(50)))\(text.count > 50 ? "..." : "")"
                 } else {
-                    statusMessage = "Accessibility permission required to paste"
+                    statusMessage = "Accessibility permission required to paste (saved to history)"
                     overlayState.phase = .accessibilityRequired
                     overlayController?.show()
                     isTranscribing = false

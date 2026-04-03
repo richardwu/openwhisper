@@ -12,7 +12,9 @@ struct OpenWhisperApp: App {
         let config = LaunchConfiguration.current
 
         let environment: AppEnvironment
-        if config.isTestMode, let scenario = config.testScenario {
+        if config.isTestMode,
+           let scenarioRaw = config.testScenario,
+           let scenario = TestScenario(rawValue: scenarioRaw) {
             let suiteName = config.defaultsSuiteName ?? "com.openwhisper.test.\(UUID().uuidString)"
             environment = .test(scenario: scenario, suiteName: suiteName)
         } else {

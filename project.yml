@@ -44,6 +44,7 @@ targets:
         Debug:
           PRODUCT_BUNDLE_IDENTIFIER: com.openwhisper.OpenWhisper.dev
           PRODUCT_NAME: "OpenWhisper (Dev)"
+          PRODUCT_MODULE_NAME: OpenWhisper
     dependencies:
       - package: SwiftWhisper
       - package: KeyboardShortcuts
@@ -74,6 +75,9 @@ targets:
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         GENERATE_INFOPLIST_FILE: true
+      configs:
+        Debug:
+          TEST_HOST: "$(BUILT_PRODUCTS_DIR)/OpenWhisper (Dev).app/Contents/MacOS/OpenWhisper (Dev)"
     dependencies:
       - target: OpenWhisper
 
@@ -90,6 +94,9 @@ targets:
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         GENERATE_INFOPLIST_FILE: true
+      configs:
+        Debug:
+          TEST_HOST: "$(BUILT_PRODUCTS_DIR)/OpenWhisper (Dev).app/Contents/MacOS/OpenWhisper (Dev)"
     dependencies:
       - target: OpenWhisper
 
@@ -106,3 +113,20 @@ targets:
         TEST_TARGET_NAME: OpenWhisper
     dependencies:
       - target: OpenWhisper
+
+schemes:
+  OpenWhisper:
+    build:
+      targets:
+        OpenWhisper: all
+        OpenWhisperTests: [test]
+        OpenWhisperTranscriptionTests: [test]
+        OpenWhisperUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - OpenWhisperTests
+        - OpenWhisperTranscriptionTests
+        - OpenWhisperUITests

@@ -15,6 +15,14 @@ xcodegen generate
 
 rm -rf .build/xcresult/transcription-real.xcresult
 
+# OPENWHISPER_MODEL_PATH is read from the shell environment by the test host
+# process at runtime via ProcessInfo.processInfo.environment — no need to pass
+# it as an xcodebuild build setting.
+#
+# Ad-hoc signing is used here for CI compatibility. For local development,
+# consider passing CODE_SIGN_IDENTITY="Apple Development" CODE_SIGN_STYLE=Manual
+# DEVELOPMENT_TEAM=T2ZTUY8F2X to preserve Microphone/Accessibility permissions
+# across rebuilds (see CLAUDE.md).
 echo "==> Running real transcription tests..."
 xcodebuild test \
   -scheme OpenWhisper \
@@ -22,7 +30,6 @@ xcodebuild test \
   -destination 'platform=macOS' \
   -derivedDataPath .build \
   -resultBundlePath .build/xcresult/transcription-real.xcresult \
-  OPENWHISPER_MODEL_PATH="$OPENWHISPER_MODEL_PATH" \
   CODE_SIGN_IDENTITY="-" \
   2>&1 | tail -20
 

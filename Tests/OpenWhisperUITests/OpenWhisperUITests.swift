@@ -18,7 +18,7 @@ final class OpenWhisperUITests: XCTestCase {
     // MARK: - launch_ready_state
 
     func testLaunchReadyState() {
-        app.launchForTest(scenario: "launch_ready_state")
+        app.launchForTest(scenario: .launchReadyState)
 
         // Main window should be visible
         let window = app.windows.firstMatch
@@ -40,7 +40,7 @@ final class OpenWhisperUITests: XCTestCase {
     // MARK: - mic_denied
 
     func testMicDenied() {
-        app.launchForTest(scenario: "mic_denied")
+        app.launchForTest(scenario: .micDenied)
 
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 10))
@@ -52,7 +52,7 @@ final class OpenWhisperUITests: XCTestCase {
     // MARK: - model_downloading
 
     func testModelDownloading() {
-        app.launchForTest(scenario: "model_downloading")
+        app.launchForTest(scenario: .modelDownloading)
 
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 10))
@@ -64,7 +64,7 @@ final class OpenWhisperUITests: XCTestCase {
     // MARK: - accessibility_denied
 
     func testAccessibilityDenied() {
-        app.launchForTest(scenario: "accessibility_denied")
+        app.launchForTest(scenario: .accessibilityDenied)
 
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 10))
@@ -76,7 +76,7 @@ final class OpenWhisperUITests: XCTestCase {
     // MARK: - history_management
 
     func testHistoryManagement() {
-        app.launchForTest(scenario: "history_management")
+        app.launchForTest(scenario: .historyManagement)
 
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 10))

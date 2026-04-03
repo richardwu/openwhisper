@@ -36,7 +36,7 @@ final class TranscriptionService {
     func transcribe(
         audioFrames: [Float],
         modelURL: URL,
-        language: WhisperLanguage,
+        language: WhisperLanguage = .english,
         initialPrompt: String? = nil
     ) async throws -> String {
         switch mode {

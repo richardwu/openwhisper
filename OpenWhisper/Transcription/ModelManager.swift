@@ -52,6 +52,8 @@ final class ModelManager {
         "ggml-small.en-q5_1.bin",
         "ggml-medium.en-q5_0.bin",
     ]
+
+
     var isDownloading = false
     var downloadProgress: Double = 0
     var errorMessage: String?
