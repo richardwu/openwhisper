@@ -6,7 +6,7 @@ final class AppStateTests: XCTestCase {
 
     private var suiteName: String = ""
 
-    private func makeAppState(scenario: String) -> AppState {
+    private func makeAppState(scenario: TestScenario) -> AppState {
         suiteName = "com.openwhisper.test.\(UUID().uuidString)"
         let env = AppEnvironment.test(scenario: scenario, suiteName: suiteName)
         return AppState(environment: env)
@@ -22,7 +22,7 @@ final class AppStateTests: XCTestCase {
     // MARK: - Launch Ready State
 
     func testLaunchReadyState() {
-        let state = makeAppState(scenario: "launch_ready_state")
+        let state = makeAppState(scenario: .launchReadyState)
         XCTAssertEqual(state.statusMessage, "Ready")
         XCTAssertFalse(state.isRecording)
         XCTAssertFalse(state.isTranscribing)
@@ -34,7 +34,7 @@ final class AppStateTests: XCTestCase {
     // MARK: - Record to Transcribe Success
 
     func testRecordToTranscribeSuccess() async {
-        let state = makeAppState(scenario: "record_to_transcribe_success")
+        let state = makeAppState(scenario: .recordToTranscribeSuccess)
 
         // Start recording
         await state.toggleRecording()
@@ -56,7 +56,7 @@ final class AppStateTests: XCTestCase {
     // MARK: - No Speech
 
     func testNoSpeech() async {
-        let state = makeAppState(scenario: "no_speech")
+        let state = makeAppState(scenario: .noSpeech)
 
         await state.toggleRecording()
         XCTAssertTrue(state.isRecording)
@@ -71,7 +71,7 @@ final class AppStateTests: XCTestCase {
     // MARK: - Mic Denied
 
     func testMicDenied() async {
-        let state = makeAppState(scenario: "mic_denied")
+        let state = makeAppState(scenario: .micDenied)
 
         await state.toggleRecording()
         XCTAssertFalse(state.isRecording)
@@ -81,25 +81,26 @@ final class AppStateTests: XCTestCase {
     // MARK: - Accessibility Denied
 
     func testAccessibilityDenied() async {
-        let state = makeAppState(scenario: "accessibility_denied")
+        let state = makeAppState(scenario: .accessibilityDenied)
 
         // Start recording (mic is granted)
         await state.toggleRecording()
         XCTAssertTrue(state.isRecording)
 
-        // Stop → transcribe succeeds but accessibility is denied → no paste, no history
+        // Stop → transcribe succeeds but accessibility is denied → no paste, but saved to history
         await state.toggleRecording()
         XCTAssertFalse(state.isRecording)
-        XCTAssertEqual(state.statusMessage, "Accessibility permission required to paste")
+        XCTAssertEqual(state.statusMessage, "Accessibility permission required to paste (saved to history)")
         XCTAssertTrue(state.pasteService.pastedTexts.isEmpty)
-        XCTAssertTrue(state.historyStore.entries.isEmpty)
+        XCTAssertEqual(state.historyStore.entries.count, 1)
+        XCTAssertEqual(state.historyStore.entries.first?.text, "Hello world")
         XCTAssertEqual(state.overlayState.phase, .accessibilityRequired)
     }
 
     // MARK: - Model Downloading
 
     func testModelDownloading() async {
-        let state = makeAppState(scenario: "model_downloading")
+        let state = makeAppState(scenario: .modelDownloading)
 
         // Try to record while model is downloading
         await state.toggleRecording()
@@ -110,7 +111,7 @@ final class AppStateTests: XCTestCase {
     // MARK: - Transcription Error
 
     func testTranscriptionError() async {
-        let state = makeAppState(scenario: "transcription_error")
+        let state = makeAppState(scenario: .transcriptionError)
 
         await state.toggleRecording()
         XCTAssertTrue(state.isRecording)
@@ -125,7 +126,7 @@ final class AppStateTests: XCTestCase {
     // MARK: - Cancel Recording
 
     func testCancelRecording() async {
-        let state = makeAppState(scenario: "record_to_transcribe_success")
+        let state = makeAppState(scenario: .recordToTranscribeSuccess)
 
         await state.toggleRecording()
         XCTAssertTrue(state.isRecording)
@@ -140,7 +141,7 @@ final class AppStateTests: XCTestCase {
     // MARK: - History Management
 
     func testHistoryManagement() {
-        let state = makeAppState(scenario: "history_management")
+        let state = makeAppState(scenario: .historyManagement)
 
         XCTAssertEqual(state.historyStore.entries.count, 3)
         XCTAssertEqual(state.historyStore.entries[0].text, "Third entry")

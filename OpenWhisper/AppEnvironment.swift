@@ -1,5 +1,17 @@
 import Foundation
 
+/// Test scenarios for dependency injection.
+enum TestScenario: String, CaseIterable {
+    case launchReadyState = "launch_ready_state"
+    case recordToTranscribeSuccess = "record_to_transcribe_success"
+    case noSpeech = "no_speech"
+    case micDenied = "mic_denied"
+    case accessibilityDenied = "accessibility_denied"
+    case modelDownloading = "model_downloading"
+    case transcriptionError = "transcription_error"
+    case historyManagement = "history_management"
+}
+
 /// Dependency container built once from LaunchConfiguration and passed into AppState.
 @MainActor
 struct AppEnvironment {
@@ -37,11 +49,11 @@ struct AppEnvironment {
         )
     }
 
-    static func test(scenario: String, suiteName: String = UUID().uuidString) -> AppEnvironment {
+    static func test(scenario: TestScenario, suiteName: String = UUID().uuidString) -> AppEnvironment {
         let defaults = UserDefaults(suiteName: suiteName)!
         let config = LaunchConfiguration(
             isTestMode: true,
-            testScenario: scenario,
+            testScenario: scenario.rawValue,
             defaultsSuiteName: suiteName,
             disableSparkle: true,
             disableHotkeys: true,
@@ -50,7 +62,7 @@ struct AppEnvironment {
 
         let env: AppEnvironment
         switch scenario {
-        case "launch_ready_state":
+        case .launchReadyState:
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: [])),
                 transcriptionService: TranscriptionService(mode: .stub(result: "")),
@@ -60,7 +72,7 @@ struct AppEnvironment {
                 historyStore: HistoryStore(defaults: defaults),
                 launchConfig: config
             )
-        case "record_to_transcribe_success":
+        case .recordToTranscribeSuccess:
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: Array(repeating: 0.1, count: 16000))),
                 transcriptionService: TranscriptionService(mode: .stub(result: "Hello world")),
@@ -70,7 +82,7 @@ struct AppEnvironment {
                 historyStore: HistoryStore(defaults: defaults),
                 launchConfig: config
             )
-        case "no_speech":
+        case .noSpeech:
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: Array(repeating: 0.0, count: 16000))),
                 transcriptionService: TranscriptionService(mode: .stub(result: "")),
@@ -80,7 +92,7 @@ struct AppEnvironment {
                 historyStore: HistoryStore(defaults: defaults),
                 launchConfig: config
             )
-        case "mic_denied":
+        case .micDenied:
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: [])),
                 transcriptionService: TranscriptionService(mode: .stub(result: "")),
@@ -90,7 +102,7 @@ struct AppEnvironment {
                 historyStore: HistoryStore(defaults: defaults),
                 launchConfig: config
             )
-        case "accessibility_denied":
+        case .accessibilityDenied:
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: Array(repeating: 0.1, count: 16000))),
                 transcriptionService: TranscriptionService(mode: .stub(result: "Hello world")),
@@ -100,7 +112,7 @@ struct AppEnvironment {
                 historyStore: HistoryStore(defaults: defaults),
                 launchConfig: config
             )
-        case "model_downloading":
+        case .modelDownloading:
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: [])),
                 transcriptionService: TranscriptionService(mode: .stub(result: "")),
@@ -110,7 +122,7 @@ struct AppEnvironment {
                 historyStore: HistoryStore(defaults: defaults),
                 launchConfig: config
             )
-        case "transcription_error":
+        case .transcriptionError:
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: Array(repeating: 0.1, count: 16000))),
                 transcriptionService: TranscriptionService(mode: .stubError),
@@ -120,7 +132,7 @@ struct AppEnvironment {
                 historyStore: HistoryStore(defaults: defaults),
                 launchConfig: config
             )
-        case "history_management":
+        case .historyManagement:
             let store = HistoryStore(defaults: defaults)
             store.add(text: "First entry")
             store.add(text: "Second entry")
@@ -132,17 +144,6 @@ struct AppEnvironment {
                 modelManager: ModelManager(mode: .ready, defaults: defaults),
                 permissionsClient: PermissionsClient(mode: .mock(microphone: true, accessibility: true)),
                 historyStore: store,
-                launchConfig: config
-            )
-        default:
-            // Default test env — everything ready
-            env = AppEnvironment(
-                audioRecorder: AudioRecorder(mode: .fixture(samples: [])),
-                transcriptionService: TranscriptionService(mode: .stub(result: "")),
-                pasteService: PasteService(mode: .spy),
-                modelManager: ModelManager(mode: .ready, defaults: defaults),
-                permissionsClient: PermissionsClient(mode: .mock(microphone: true, accessibility: true)),
-                historyStore: HistoryStore(defaults: defaults),
                 launchConfig: config
             )
         }

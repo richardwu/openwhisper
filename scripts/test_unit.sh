@@ -8,6 +8,10 @@ xcodegen generate
 
 rm -rf .build/xcresult/unit.xcresult
 
+# Ad-hoc signing is used here for CI compatibility. For local development,
+# consider passing CODE_SIGN_IDENTITY="Apple Development" CODE_SIGN_STYLE=Manual
+# DEVELOPMENT_TEAM=T2ZTUY8F2X to preserve Microphone/Accessibility permissions
+# across rebuilds (see CLAUDE.md).
 echo "==> Running unit tests..."
 xcodebuild test \
   -scheme OpenWhisper \
