@@ -77,8 +77,10 @@ final class ModelManager {
 
     var isModelReady: Bool {
         switch mode {
-        case .ready, .fixedPath:
+        case .ready:
             return true
+        case .fixedPath(let url):
+            return FileManager.default.fileExists(atPath: url.path)
         case .downloading, .missing, .failed:
             return false
         case .live:
@@ -89,7 +91,7 @@ final class ModelManager {
     var modelFileURL: URL? {
         switch mode {
         case .fixedPath(let url):
-            return url
+            return FileManager.default.fileExists(atPath: url.path) ? url : nil
         case .ready:
             // Return a sentinel URL for test mode — TranscriptionService stub won't use it
             return URL(fileURLWithPath: "/tmp/test-model.bin")

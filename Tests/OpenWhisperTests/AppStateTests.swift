@@ -31,6 +31,15 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(state.permissionsClient.isAccessibilityGranted)
     }
 
+    func testFixedModelPathMustExist() {
+        let missingURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("missing-model-\(UUID().uuidString).bin")
+        let manager = ModelManager(mode: .fixedPath(missingURL))
+
+        XCTAssertFalse(manager.isModelReady)
+        XCTAssertNil(manager.modelFileURL)
+    }
+
     // MARK: - Record to Transcribe Success
 
     func testRecordToTranscribeSuccess() async {
