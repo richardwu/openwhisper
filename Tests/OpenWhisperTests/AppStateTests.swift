@@ -27,6 +27,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertFalse(state.isRecording)
         XCTAssertFalse(state.isTranscribing)
         XCTAssertTrue(state.modelManager.isModelReady)
+        XCTAssertEqual(state.modelManager.selectedLanguage, .english)
         XCTAssertTrue(state.permissionsClient.isMicrophoneAuthorized)
         XCTAssertTrue(state.permissionsClient.isAccessibilityGranted)
     }

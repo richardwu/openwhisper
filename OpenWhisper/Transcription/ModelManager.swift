@@ -125,7 +125,7 @@ final class ModelManager {
         let storedLanguage = defaults.string(forKey: DefaultsKey.selectedLanguage) ?? ""
 
         self.selectedModel = WhisperModel(rawValue: storedModel) ?? .small
-        self.selectedLanguage = WhisperLanguage(rawValue: storedLanguage) ?? .auto
+        self.selectedLanguage = WhisperLanguage(rawValue: storedLanguage) ?? .english
 
         // Apply test mode initial state
         switch mode {
