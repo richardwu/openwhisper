@@ -21,6 +21,6 @@ enum AppIdentity {
     }()
 
     static func isMainWindow(_ window: NSWindow) -> Bool {
-        window.identifier?.rawValue == mainWindowID
+        window.identifier?.rawValue == mainWindowID || window.title == displayName
     }
 }

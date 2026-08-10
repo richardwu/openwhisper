@@ -1,0 +1,22 @@
+{
+  "fixtures": [
+    {
+      "file": "silence.wav",
+      "expected": "",
+      "notes": "Pure silence — should produce empty string after filtering hallucinated phrases.",
+      "ci_blocking": true
+    },
+    {
+      "file": "background-noise.wav",
+      "expected": "",
+      "notes": "Low-amplitude random noise — should produce empty or near-empty output.",
+      "ci_blocking": true
+    },
+    {
+      "file": "english-e2e-test-1.m4a",
+      "expected": "Hello, this is me testing that OpenWhisper end-to-end tests work properly.",
+      "notes": "Clear English speech for full pipeline E2E validation. Model output may vary in capitalization/punctuation.",
+      "ci_blocking": true
+    }
+  ]
+}

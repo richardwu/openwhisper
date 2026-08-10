@@ -16,6 +16,12 @@ final class AudioLevelMeter: Sendable {
 @MainActor
 @Observable
 final class AudioRecorder {
+    enum Mode {
+        case live
+        case fixture(samples: [Float])
+    }
+
+    @ObservationIgnored private let mode: Mode
     @ObservationIgnored private var engine: AVAudioEngine?
     @ObservationIgnored private var samples: [Float] = []
     @ObservationIgnored private let sampleRate: Double = 16000
@@ -24,7 +30,34 @@ final class AudioRecorder {
     var recentLevels: [Float] = Array(repeating: 0, count: 30)
     @ObservationIgnored private var levelTimer: Timer?
 
+    init(mode: Mode = .live) {
+        self.mode = mode
+    }
+
     func startRecording() throws {
+        switch mode {
+        case .live:
+            try startLiveRecording()
+        case .fixture:
+            // Fixture mode: no-op on start, samples returned on stop
+            samples = []
+            recentLevels = Array(repeating: 0.1, count: 30)
+        }
+    }
+
+    func stopRecording() -> [Float] {
+        switch mode {
+        case .live:
+            return stopLiveRecording()
+        case .fixture(let fixtureSamples):
+            recentLevels = Array(repeating: 0, count: 30)
+            return fixtureSamples
+        }
+    }
+
+    // MARK: - Live Implementation
+
+    private func startLiveRecording() throws {
         samples = []
         recentLevels = Array(repeating: 0, count: 30)
 
@@ -69,7 +102,7 @@ final class AudioRecorder {
         }
     }
 
-    func stopRecording() -> [Float] {
+    private func stopLiveRecording() -> [Float] {
         levelTimer?.invalidate()
         levelTimer = nil
 

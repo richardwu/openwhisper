@@ -1,0 +1,62 @@
+{
+  "configurations" : [
+    {
+      "id" : "unit",
+      "name" : "Unit",
+      "options" : {}
+    },
+    {
+      "id" : "ui-fast",
+      "name" : "UIFast",
+      "options" : {}
+    },
+    {
+      "id" : "transcription-real",
+      "name" : "TranscriptionReal",
+      "options" : {}
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:OpenWhisper.xcodeproj",
+      "identifier" : "OpenWhisper",
+      "name" : "OpenWhisper"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:OpenWhisper.xcodeproj",
+        "identifier" : "OpenWhisperTests",
+        "name" : "OpenWhisperTests"
+      },
+      "selectedTests" : [],
+      "skippedTests" : [],
+      "parallelizable" : true,
+      "enabled" : true
+    },
+    {
+      "target" : {
+        "containerPath" : "container:OpenWhisper.xcodeproj",
+        "identifier" : "OpenWhisperUITests",
+        "name" : "OpenWhisperUITests"
+      },
+      "selectedTests" : [],
+      "skippedTests" : [],
+      "parallelizable" : false,
+      "enabled" : true
+    },
+    {
+      "target" : {
+        "containerPath" : "container:OpenWhisper.xcodeproj",
+        "identifier" : "OpenWhisperTranscriptionTests",
+        "name" : "OpenWhisperTranscriptionTests"
+      },
+      "selectedTests" : [],
+      "skippedTests" : [],
+      "parallelizable" : false,
+      "enabled" : true
+    }
+  ],
+  "version" : 1
+}

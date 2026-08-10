@@ -44,6 +44,7 @@ targets:
         Debug:
           PRODUCT_BUNDLE_IDENTIFIER: com.openwhisper.OpenWhisper.dev
           PRODUCT_NAME: "OpenWhisper (Dev)"
+          PRODUCT_MODULE_NAME: OpenWhisper
     dependencies:
       - package: SwiftWhisper
       - package: KeyboardShortcuts
@@ -63,3 +64,69 @@ targets:
       path: OpenWhisper/OpenWhisper.entitlements
       properties:
         com.apple.security.device.audio-input: true
+
+  OpenWhisperTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/OpenWhisperTests
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        GENERATE_INFOPLIST_FILE: true
+      configs:
+        Debug:
+          TEST_HOST: "$(BUILT_PRODUCTS_DIR)/OpenWhisper (Dev).app/Contents/MacOS/OpenWhisper (Dev)"
+    dependencies:
+      - target: OpenWhisper
+
+  OpenWhisperTranscriptionTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/OpenWhisperTranscriptionTests
+      - path: Tests/Fixtures
+        buildPhase: resources
+        type: folder
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        GENERATE_INFOPLIST_FILE: true
+      configs:
+        Debug:
+          TEST_HOST: "$(BUILT_PRODUCTS_DIR)/OpenWhisper (Dev).app/Contents/MacOS/OpenWhisper (Dev)"
+    dependencies:
+      - target: OpenWhisper
+
+  OpenWhisperUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: Tests/OpenWhisperUITests
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        GENERATE_INFOPLIST_FILE: true
+        TEST_TARGET_NAME: OpenWhisper
+    dependencies:
+      - target: OpenWhisper
+
+schemes:
+  OpenWhisper:
+    build:
+      targets:
+        OpenWhisper: all
+        OpenWhisperTests: [test]
+        OpenWhisperTranscriptionTests: [test]
+        OpenWhisperUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - OpenWhisperTests
+        - OpenWhisperTranscriptionTests
+        - OpenWhisperUITests
