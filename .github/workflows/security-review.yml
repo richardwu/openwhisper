@@ -40,11 +40,11 @@ jobs:
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           if git diff --quiet "$BASE_SHA" -- .github/workflows/security-review.yml; then
             echo "workflow_changed=false" >> "$GITHUB_OUTPUT"
+            git checkout "$BASE_SHA" -- .agents/skills/security-review/SKILL.md
           else
             echo "::notice::Skipping security review because this PR changes security-review.yml; OAuth workflow validation requires the default-branch workflow."
             echo "workflow_changed=true" >> "$GITHUB_OUTPUT"
           fi
-          git checkout "$BASE_SHA" -- .agents/skills/security-review/SKILL.md
 
       - name: Run Security Review
         if: steps.trusted-skill.outputs.workflow_changed != 'true'
