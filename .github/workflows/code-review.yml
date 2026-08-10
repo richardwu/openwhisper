@@ -1,0 +1,64 @@
+name: Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+jobs:
+  code-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      # Required by the review action for OAuth/OIDC exchange.
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+
+      # The PR can change `.agents/skills/code-review/SKILL.md` to weaken
+      # the rubric or hide findings. Always restore the skill from the base
+      # branch so the review prompt is the trusted version, not what the PR
+      # ships. If this workflow itself changed, skip because OAuth workflow
+      # validation requires the default-branch workflow.
+      - name: Restore trusted code-review skill from base branch
+        id: trusted-skill
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          case "$BASE_SHA" in
+            ""|*[!0-9a-fA-F]*)
+              echo "::error::Unexpected pull request base SHA"
+              exit 1
+              ;;
+          esac
+          if [ "${#BASE_SHA}" -ne 40 ]; then
+            echo "::error::Unexpected pull request base SHA length"
+            exit 1
+          fi
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          if git diff --quiet "$BASE_SHA" -- .github/workflows/code-review.yml; then
+            echo "workflow_changed=false" >> "$GITHUB_OUTPUT"
+            git checkout "$BASE_SHA" -- .agents/skills/code-review/SKILL.md
+          else
+            echo "::notice::Skipping code review because this PR changes code-review.yml; OAuth workflow validation requires the default-branch workflow."
+            echo "workflow_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Code Review
+        if: steps.trusted-skill.outputs.workflow_changed != 'true'
+        id: code-review
+        uses: anthropics/claude-code-action@939ae9c056ecf8a1a01409ddd1c4eadec5f8c77b # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: cursor[bot],cursor,claude[bot],claude
+          track_progress: true
+          prompt: '/code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
+          claude_args: >-
+            --allowedTools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),mcp__github_inline_comment__create_inline_comment"
+            --disallowedTools "Bash(git add:*),Bash(git commit:*),Bash(git rm:*),Bash(git push:*),Bash(/home/runner/_work/_actions/anthropics/claude-code-action/v1/scripts/git-push.sh:*)"
