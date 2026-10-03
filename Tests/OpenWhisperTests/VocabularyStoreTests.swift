@@ -45,6 +45,11 @@ final class VocabularyStoreTests: XCTestCase {
         XCTAssertTrue(store.learnedTerms.isEmpty)
     }
 
+    func testCorrectionDropsSentencePunctuation() {
+        XCTAssertTrue(store.recordCorrection(from: "use open whisper", to: "use OpenWhisper."))
+        XCTAssertEqual(store.learnedTerms, ["OpenWhisper"])
+    }
+
     func testForgetLeavesBundledTermAvailable() {
         XCTAssertTrue(store.learn(term: "PostgreSQL"))
         store.forget(term: "PostgreSQL")

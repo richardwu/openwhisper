@@ -212,7 +212,7 @@ final class VocabularyStore {
         // Accept word joining only when the replacement has exactly the same
         // letters as the old span. This rejects arbitrary rewrites.
         if changedAfter.count == 1,
-           changedBefore.joined().lowercased() == changedAfter[0].lowercased() {
+           changedBefore.joined().lowercased() == Self.normalizedTerm(changedAfter[0]).lowercased() {
             return changedAfter
         }
 
@@ -229,7 +229,16 @@ final class VocabularyStore {
     }
 
     private static func normalizedTerm(_ term: String) -> String {
-        term.trimmingCharacters(in: .whitespacesAndNewlines)
+        var value = term.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Keep developer punctuation inside a term (`Node.js`, `.NET`, `C++`),
+        // but do not persist sentence punctuation from an edited text span.
+        while let last = value.last, ".,!?;:)]}".contains(last) {
+            value.removeLast()
+        }
+        while let first = value.first, "\"'([{".contains(first) {
+            value.removeFirst()
+        }
+        return value
     }
 
     private static func comparisonKey(_ term: String) -> String {
