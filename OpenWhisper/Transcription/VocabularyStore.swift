@@ -35,6 +35,15 @@ final class VocabularyStore {
         "Core Data", "CloudKit", "StoreKit", "WidgetKit", "App Intents", "SiriKit",
         "Instruments", "TestFlight", "App Store Connect", "Info.plist", "entitlements",
 
+        // AI, product, and general knowledge-work terms. These appear before
+        // the long coding list so the default prompt covers both coding and
+        // general work within the same bounded context window.
+        "ChatGPT", "Claude", "Gemini", "Copilot", "OpenAI", "Anthropic", "GPT-4o", "GPT-5",
+        "LLM", "Transformer", "tokenizer", "embedding", "machine learning", "fine-tuning",
+        "inference", "latency", "benchmark", "regression", "A/B test", "MVP", "OKR", "KPI",
+        "ROI", "SLA", "PRD", "RFC", "ADR", "roadmap", "backlog", "sprint", "stand-up",
+        "stakeholder", "FYI", "ASAP", "ETA", "EOD", "TL;DR", "WIP",
+
         // Common languages, runtimes, frameworks, and tools.
         "TypeScript", "JavaScript", "Python", "Rust", "Go", "Kotlin", "Java", "C++",
         "C#", ".NET", "Dart", "Ruby", "PHP", "SQL", "HTML", "CSS", "JSON", "YAML",
@@ -47,17 +56,13 @@ final class VocabularyStore {
         "PostgreSQL", "Postgres", "MySQL", "SQLite", "MongoDB", "Redis", "DuckDB",
         "pgvector", "GraphQL", "REST", "gRPC", "WebSocket", "HTTP", "HTTPS", "TCP",
         "DNS", "OAuth", "OAuth2", "OpenID Connect", "JWT", "TLS", "API", "SDK", "CLI",
-        "MCP", "LLM", "RAG", "NLP", "GPU", "CPU", "RAM", "VRAM", "API key", "x402",
+        "MCP", "RAG", "NLP", "GPU", "CPU", "RAM", "VRAM", "API key", "x402",
 
-        // AI, product, and general knowledge-work terms.
-        "ChatGPT", "Claude", "Gemini", "Copilot", "OpenAI", "Anthropic", "Google",
-        "GPT-4o", "GPT-5", "Transformer", "tokenizer", "embedding", "vector database",
-        "machine learning", "deep learning", "fine-tuning", "inference", "latency",
-        "benchmark", "regression", "A/B test", "MVP", "OKR", "KPI", "ROI", "SLA",
-        "PRD", "RFC", "ADR", "roadmap", "backlog", "sprint", "stand-up", "stakeholder",
-        "workflow", "knowledge base", "meeting notes", "action items", "follow-up",
-        "calendar", "spreadsheet", "presentation", "Markdown", "PDF", "URL", "email",
-        "FAQ", "FYI", "ASAP", "ETA", "EOD", "TBD", "TL;DR", "WIP", "FOMO", "IMO",
+        // Additional general-work terms remain available when a larger prompt
+        // budget is configured or when a correction promotes a term.
+        "Google", "vector database", "deep learning", "workflow", "knowledge base",
+        "meeting notes", "action items", "follow-up", "calendar", "spreadsheet",
+        "presentation", "Markdown", "PDF", "URL", "email", "FAQ", "TBD", "FOMO", "IMO",
         "i.e.", "e.g.", "etc.", "versus", "proprietary", "open source", "offline",
         "on-device", "privacy", "Accessibility", "macOS", "iOS", "Linux", "Windows"
     ]
