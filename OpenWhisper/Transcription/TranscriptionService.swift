@@ -18,13 +18,17 @@ final class TranscriptionService {
     }
 
     private let mode: Mode
+    /// Shared local store used by transcription and correction learning.
+    /// A nil store is useful for controlled baseline benchmarks.
+    let vocabularyStore: VocabularyStore?
     private var whisperInstance: Whisper?
     private var loadedModelURL: URL?
     private var loadedLanguage: WhisperLanguage?
     private var promptPointer: UnsafeMutablePointer<CChar>?
 
-    init(mode: Mode = .live) {
+    init(mode: Mode = .live, vocabularyStore: VocabularyStore? = VocabularyStore()) {
         self.mode = mode
+        self.vocabularyStore = vocabularyStore
     }
 
     deinit {
@@ -42,7 +46,7 @@ final class TranscriptionService {
         switch mode {
         case .live:
             let whisper = try getOrCreateWhisper(modelURL: modelURL, language: language)
-            updateInitialPrompt(initialPrompt, on: whisper.params)
+            updateInitialPrompt(vocabularyStore?.makePrompt(extra: initialPrompt) ?? initialPrompt, on: whisper.params)
             let segments = try await whisper.transcribe(audioFrames: audioFrames)
             let rawText = segments.map(\.text).joined()
             return filterTranscription(rawText)
@@ -51,6 +55,23 @@ final class TranscriptionService {
         case .stubError:
             throw TranscriptionError.stubError
         }
+    }
+
+    /// Records a validated replacement observed after a transcription paste.
+    /// The caller should limit the input to the text span it owns.
+    @discardableResult
+    func recordCorrection(from original: String, to corrected: String) -> Bool {
+        vocabularyStore?.recordCorrection(from: original, to: corrected) ?? false
+    }
+
+    /// Adds one explicitly reviewed spelling to the local prompt vocabulary.
+    @discardableResult
+    func learnVocabularyTerm(_ term: String) -> Bool {
+        vocabularyStore?.learn(term: term) ?? false
+    }
+
+    func forgetVocabularyTerm(_ term: String) {
+        vocabularyStore?.forget(term: term)
     }
 
     private func updateInitialPrompt(_ prompt: String?, on params: WhisperParams) {
