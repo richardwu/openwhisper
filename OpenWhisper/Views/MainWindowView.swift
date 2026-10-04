@@ -59,19 +59,6 @@ struct MainWindowView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
 
-                if canCopyLatestTranscription {
-                    Button {
-                        copyLatestTranscription()
-                    } label: {
-                        Image(systemName: copiedLatestTranscription ? "checkmark" : "doc.on.doc")
-                            .font(.caption)
-                            .foregroundStyle(copiedLatestTranscription ? .green : .secondary)
-                    }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel(copiedLatestTranscription ? "Latest transcription copied" : "Copy latest transcription")
-                    .help("Copy latest transcription")
-                }
-
                 Spacer()
 
                 if !appState.modelManager.isModelReady {
@@ -86,6 +73,19 @@ struct MainWindowView: View {
                             .font(.caption2)
                             .foregroundStyle(.orange)
                     }
+                }
+
+                if canCopyLatestTranscription {
+                    Button {
+                        copyLatestTranscription()
+                    } label: {
+                        Image(systemName: copiedLatestTranscription ? "checkmark" : "doc.on.doc")
+                            .font(.caption)
+                            .foregroundStyle(copiedLatestTranscription ? .green : .secondary)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(copiedLatestTranscription ? "Latest transcription copied" : "Copy latest transcription")
+                    .help("Copy latest transcription")
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
