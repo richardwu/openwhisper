@@ -39,6 +39,18 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         self.vocabularyStore = vocabularyStore
     }
 
+    static func supportedWhisperLanguages() async -> [WhisperLanguage] {
+        guard SpeechTranscriber.isAvailable else { return [] }
+        let supportedLocales = await SpeechTranscriber.supportedLocales
+        return WhisperLanguage.allCases.filter { language in
+            guard language != .auto else { return false }
+            let languageCode = language.appleLocale.languageCode ?? language.rawValue
+            return supportedLocales.contains { locale in
+                (locale.languageCode ?? locale.identifier) == languageCode
+            }
+        }
+    }
+
     func configure(language: WhisperLanguage) {
         self.language = language
     }

@@ -6,6 +6,7 @@ struct SettingsTabView: View {
     let appState: AppState
     @State private var micAuthorized = false
     @State private var accessibilityGranted = false
+    @State private var appleLanguageOptions: [WhisperLanguage] = [.english]
 
     private let permissionTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
@@ -99,6 +100,13 @@ struct SettingsTabView: View {
         .onAppear {
             refreshPermissions()
         }
+        .task {
+            await refreshAppleLanguages()
+        }
+        .onChange(of: appState.modelManager.selectedBackend) { _, backend in
+            guard backend == .appleStreaming else { return }
+            Task { await refreshAppleLanguages() }
+        }
     }
 
     private func refreshPermissions() {
@@ -107,7 +115,23 @@ struct SettingsTabView: View {
     }
 
     private var languageOptions: [WhisperLanguage] {
-        [.auto] + WhisperLanguage.allCases.filter { $0 != .auto }
+        if appState.modelManager.selectedBackend == .appleStreaming {
+            return appleLanguageOptions
+        }
+        return [.auto] + WhisperLanguage.allCases.filter { $0 != .auto }
+    }
+
+    private func refreshAppleLanguages() async {
+        guard #available(macOS 26.0, *) else { return }
+        let supported = await AppleStreamingTranscriptionService.supportedWhisperLanguages()
+        let options = supported.isEmpty ? [.english] : supported
+        await MainActor.run {
+            appleLanguageOptions = options
+            if appState.modelManager.selectedBackend == .appleStreaming,
+               !options.contains(appState.modelManager.selectedLanguage) {
+                appState.modelManager.selectedLanguage = .english
+            }
+        }
     }
 }
 
