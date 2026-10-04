@@ -26,7 +26,25 @@ final class VocabularyStoreTests: XCTestCase {
 
         XCTAssertTrue(prompt.contains("OpenWhisper"))
         XCTAssertTrue(prompt.contains("SwiftUI"))
+        XCTAssertTrue(prompt.contains("PostgreSQL"))
+        XCTAssertTrue(prompt.contains("ChatGPT"))
+        XCTAssertTrue(prompt.contains("PRD"))
         XCTAssertLessThanOrEqual(prompt.count, 900)
+    }
+
+    func testDefaultPromptUsesTheMixedHighPriorityPrefix() throws {
+        let defaultStore = VocabularyStore(defaults: defaults)
+        let prompt = try XCTUnwrap(defaultStore.initialPrompt)
+
+        XCTAssertTrue(prompt.contains("OpenWhisper"))
+        XCTAssertTrue(prompt.contains("PostgreSQL"))
+        XCTAssertTrue(prompt.contains("ChatGPT"))
+        XCTAssertTrue(prompt.contains("PRD"))
+        XCTAssertLessThanOrEqual(prompt.count, VocabularyStore.defaultMaxPromptCharacters)
+        XCTAssertLessThanOrEqual(
+            prompt.split(separator: ",").count,
+            VocabularyStore.defaultMaxTerms
+        )
     }
 
     func testLearnedCorrectionIsPrioritizedAndPersists() throws {

@@ -38,10 +38,21 @@ struct AppEnvironment {
             modelManager = ModelManager(mode: .live, defaults: defaults)
         }
 
+        let vocabularyStore = VocabularyStore(defaults: defaults)
+        let transcriptionService = TranscriptionService(mode: .live, vocabularyStore: vocabularyStore)
+        let correctionLearningService = CorrectionLearningService(
+            recordCorrection: { [weak transcriptionService] original, corrected in
+                transcriptionService?.recordCorrection(from: original, to: corrected) ?? false
+            },
+            learnedTerms: { [weak transcriptionService] in
+                transcriptionService?.vocabularyStore?.learnedTerms ?? []
+            }
+        )
+
         return AppEnvironment(
             audioRecorder: AudioRecorder(mode: .live),
-            transcriptionService: TranscriptionService(mode: .live),
-            pasteService: PasteService(mode: .live),
+            transcriptionService: transcriptionService,
+            pasteService: PasteService(mode: .live, correctionLearningService: correctionLearningService),
             modelManager: modelManager,
             permissionsClient: PermissionsClient(mode: .live),
             historyStore: HistoryStore(defaults: defaults),

@@ -9,12 +9,14 @@ final class PasteService {
     }
 
     private let mode: Mode
+    let correctionLearningService: CorrectionLearningService
 
     /// In spy mode, records each pasted text for test assertions.
     private(set) var pastedTexts: [String] = []
 
-    init(mode: Mode = .live) {
+    init(mode: Mode = .live, correctionLearningService: CorrectionLearningService? = nil) {
         self.mode = mode
+        self.correctionLearningService = correctionLearningService ?? CorrectionLearningService()
     }
 
     func paste(text: String) {
@@ -27,6 +29,9 @@ final class PasteService {
     }
 
     private func livePaste(text: String) {
+        // Capture the focused Accessibility element before Cmd-V. The learner
+        // observes only this element for a short window and never records keys.
+        correctionLearningService.beginInsertion(text)
         let pasteboard = NSPasteboard.general
 
         // Save current clipboard contents

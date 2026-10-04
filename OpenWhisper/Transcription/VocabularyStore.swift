@@ -22,47 +22,59 @@ final class VocabularyStore {
     /// The order is intentional. Terms near the start are more likely to fit
     /// when the prompt character budget is reached.
     static let bundledTerms: [String] = [
+        // High-value terms that should be available in the default prompt.
+        "OpenWhisper", "SwiftUI", "PostgreSQL", "ChatGPT", "Claude", "OpenAI",
+        "TypeScript", "Python", "JavaScript", "GitHub", "Docker", "JSON", "API",
+        "SDK", "MCP", "OAuth", "LLM", "PRD", "RFC", "MVP", "OKR", "KPI", "ETA", "TL;DR",
+
         // OpenWhisper and local speech terms.
-        "OpenWhisper", "SwiftWhisper", "whisper.cpp", "WhisperKit", "FluidAudio",
+        "SwiftWhisper", "whisper.cpp", "WhisperKit", "FluidAudio",
         "Parakeet", "Nemotron", "SpeechAnalyzer", "SpeechTranscriber", "CoreML",
         "Metal", "Accelerate", "AVAudioEngine", "AudioUnit", "TCC",
 
         // Swift and Apple development.
-        "Swift", "SwiftUI", "UIKit", "AppKit", "Xcode", "xcodebuild", "XCTest",
-        "XcodeGen", "project.yml", "SPM", "Swift Package Manager", "Package.swift",
-        "Combine", "Observation", "Observable", "async/await", "AsyncStream",
-        "Task", "actor", "MainActor", "Sendable", "Codable", "UserDefaults",
-        "Core Data", "CloudKit", "StoreKit", "WidgetKit", "App Intents", "SiriKit",
-        "Instruments", "TestFlight", "App Store Connect", "Info.plist", "entitlements",
+        "Swift", "UIKit", "AppKit", "Xcode", "xcodebuild", "XCTest",
+        "XcodeGen", "SPM", "Package.swift", "async/await", "AsyncStream",
+        "MainActor", "Sendable", "Codable", "UserDefaults",
+
+        // High-frequency coding terms and acronyms.
+        "Rust", "Go", "React", "Next.js", "SQL", "YAML", "Git",
+        "GraphQL", "REST", "CLI",
 
         // AI, product, and general knowledge-work terms. These appear before
         // the long coding list so the default prompt covers both coding and
         // general work within the same bounded context window.
-        "ChatGPT", "Claude", "Gemini", "Copilot", "OpenAI", "Anthropic", "GPT-4o", "GPT-5",
-        "LLM", "Transformer", "tokenizer", "embedding", "machine learning", "fine-tuning",
-        "inference", "latency", "benchmark", "regression", "A/B test", "MVP", "OKR", "KPI",
-        "ROI", "SLA", "PRD", "RFC", "ADR", "roadmap", "backlog", "sprint", "stand-up",
-        "stakeholder", "FYI", "ASAP", "ETA", "EOD", "TL;DR", "WIP",
+        "Gemini", "Copilot", "Anthropic", "GPT-4o", "GPT-5",
+        "Transformer", "tokenizer", "embedding", "machine learning", "fine-tuning",
+        "inference", "latency", "benchmark", "regression", "A/B test",
+        "ROI", "SLA", "ADR", "roadmap", "backlog", "sprint", "stand-up",
+        "stakeholder", "FYI", "ASAP", "EOD", "WIP",
+        "TBD", "FAQ", "IMO", "IRL", "POV", "TIL", "AFAIK", "FWIW", "OOO", "WFH", "PTO",
+        "SME", "B2B", "B2C", "GTM", "ICP", "TAM", "SAM", "SOM", "NPS", "CSAT", "SLO", "SLI",
+        "RACI", "DRI", "P0", "P1", "P2", "P3",
 
         // Common languages, runtimes, frameworks, and tools.
-        "TypeScript", "JavaScript", "Python", "Rust", "Go", "Kotlin", "Java", "C++",
-        "C#", ".NET", "Dart", "Ruby", "PHP", "SQL", "HTML", "CSS", "JSON", "YAML",
-        "Node.js", "Deno", "Bun", "React", "React Native", "Next.js", "Vue", "Svelte",
+        "Kotlin", "Java", "C++", "C#", ".NET", "Dart", "Ruby", "PHP", "HTML", "CSS",
+        "Node.js", "Deno", "Bun", "React Native", "Vue", "Svelte",
         "Angular", "Vite", "Webpack", "esbuild", "npm", "pnpm", "Yarn", "Cargo",
-        "pip", "Homebrew", "Docker", "Kubernetes", "k8s", "Terraform", "Ansible",
-        "Git", "GitHub", "GitLab", "Bitbucket", "GitHub Actions", "CI/CD", "SSH",
+        "pip", "Homebrew", "Kubernetes", "k8s", "Terraform", "Ansible",
+        "GitLab", "Bitbucket", "GitHub Actions", "CI/CD", "SSH",
 
         // Databases, APIs, infrastructure, and protocols.
-        "PostgreSQL", "Postgres", "MySQL", "SQLite", "MongoDB", "Redis", "DuckDB",
-        "pgvector", "GraphQL", "REST", "gRPC", "WebSocket", "HTTP", "HTTPS", "TCP",
-        "DNS", "OAuth", "OAuth2", "OpenID Connect", "JWT", "TLS", "API", "SDK", "CLI",
-        "MCP", "RAG", "NLP", "GPU", "CPU", "RAM", "VRAM", "API key", "x402",
+        "Postgres", "MySQL", "SQLite", "MongoDB", "Redis", "DuckDB",
+        "pgvector",
+        "gRPC", "WebSocket", "HTTP", "HTTPS", "TCP", "DNS", "OAuth2",
+        "OpenID Connect", "JWT", "TLS", "RAG", "NLP", "GPU", "CPU", "RAM", "VRAM",
+        "API key", "x402",
 
         // Additional general-work terms remain available when a larger prompt
         // budget is configured or when a correction promotes a term.
-        "Google", "vector database", "deep learning", "workflow", "knowledge base",
+        "Swift Package Manager", "Combine", "Observation", "Observable", "Task", "actor",
+        "Core Data", "CloudKit", "StoreKit", "WidgetKit", "App Intents", "SiriKit",
+        "Instruments", "TestFlight", "App Store Connect", "Info.plist", "entitlements",
+        "project.yml", "Google", "vector database", "deep learning", "workflow", "knowledge base",
         "meeting notes", "action items", "follow-up", "calendar", "spreadsheet",
-        "presentation", "Markdown", "PDF", "URL", "email", "FAQ", "TBD", "FOMO", "IMO",
+        "presentation", "Markdown", "PDF", "URL", "email", "FOMO",
         "i.e.", "e.g.", "etc.", "versus", "proprietary", "open source", "offline",
         "on-device", "privacy", "Accessibility", "macOS", "iOS", "Linux", "Windows"
     ]
