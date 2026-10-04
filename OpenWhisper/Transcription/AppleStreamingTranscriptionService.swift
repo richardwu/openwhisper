@@ -13,7 +13,6 @@ protocol StreamingTranscriptionService: AnyObject {
 }
 
 /// Uses the macOS 26 on-device SpeechTranscriber while the microphone is recording.
-/// The app keeps Whisper as a fallback for older systems and unavailable assets.
 @available(macOS 26.0, *)
 @MainActor
 final class AppleStreamingTranscriptionService: StreamingTranscriptionService {

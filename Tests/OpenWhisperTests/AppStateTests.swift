@@ -35,7 +35,11 @@ final class AppStateTests: XCTestCase {
     func testFixedModelPathMustExist() {
         let missingURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("missing-model-\(UUID().uuidString).bin")
-        let manager = ModelManager(mode: .fixedPath(missingURL))
+        let suiteName = "com.openwhisper.test.fixed-path.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.set(TranscriptionBackend.whisperSmall.rawValue, forKey: "selectedBackend")
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let manager = ModelManager(mode: .fixedPath(missingURL), defaults: defaults)
 
         XCTAssertFalse(manager.isModelReady)
         XCTAssertNil(manager.modelFileURL)

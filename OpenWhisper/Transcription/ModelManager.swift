@@ -1,5 +1,6 @@
 import Foundation
 import os
+import Speech
 import SwiftWhisper
 
 enum WhisperModel: String, CaseIterable {
@@ -35,9 +36,16 @@ enum TranscriptionBackend: String, CaseIterable {
     case whisperSmall
     case whisperMedium
 
+    static var preferredDefault: Self {
+        if #available(macOS 26.0, *), SpeechTranscriber.isAvailable {
+            return .appleStreaming
+        }
+        return .whisperSmall
+    }
+
     var displayName: String {
         switch self {
-        case .appleStreaming: return "Apple on-device streaming"
+        case .appleStreaming: return "Apple (streaming)"
         case .whisperBase: return "Whisper Base (148 MB, very fast)"
         case .whisperSmall: return "Whisper Small (163 MB, fast)"
         case .whisperMedium: return "Whisper Medium (568 MB, highest quality)"
@@ -160,10 +168,17 @@ final class ModelManager {
         let storedModel = defaults.string(forKey: DefaultsKey.selectedModel) ?? ""
         let storedBackend = defaults.string(forKey: DefaultsKey.selectedBackend) ?? ""
         let storedLanguage = defaults.string(forKey: DefaultsKey.selectedLanguage) ?? ""
+        let initialBackend: TranscriptionBackend = {
+            if case .live = mode {
+                return TranscriptionBackend.preferredDefault
+            }
+            return .whisperSmall
+        }()
 
         self.selectedModel = WhisperModel(rawValue: storedModel) ?? .small
         self.selectedBackend = TranscriptionBackend(rawValue: storedBackend)
-            ?? (WhisperModel(rawValue: storedModel).map { Self.backend(for: $0) } ?? .whisperSmall)
+            ?? (WhisperModel(rawValue: storedModel).map { Self.backend(for: $0) }
+                ?? initialBackend)
         self.selectedLanguage = WhisperLanguage(rawValue: storedLanguage) ?? .english
 
         // Apply test mode initial state
