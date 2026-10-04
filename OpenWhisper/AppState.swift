@@ -9,6 +9,7 @@ final class AppState {
     var isTranscribing = false
 
     let audioRecorder: AudioRecorder
+    let streamingTranscriptionService: (any StreamingTranscriptionService)?
     let transcriptionService: TranscriptionService
     let pasteService: PasteService
     let modelManager: ModelManager
@@ -18,9 +19,11 @@ final class AppState {
     private(set) var overlayController: OverlayController?
 
     private let launchConfig: LaunchConfiguration
+    private var streamingDidFail = false
 
     init(environment: AppEnvironment) {
         self.audioRecorder = environment.audioRecorder
+        self.streamingTranscriptionService = environment.streamingTranscriptionService
         self.transcriptionService = environment.transcriptionService
         self.pasteService = environment.pasteService
         self.modelManager = environment.modelManager
@@ -30,6 +33,14 @@ final class AppState {
 
         // Create overlay controller after all properties are initialized
         overlayController = OverlayController(overlayState: overlayState, audioRecorder: audioRecorder)
+
+        audioRecorder.onAudioFrames = { [weak streamingTranscriptionService] frames in
+            streamingTranscriptionService?.append(audioFrames: frames)
+        }
+        streamingTranscriptionService?.onPartialText = { [weak self] text in
+            guard let self, self.isRecording, !text.isEmpty else { return }
+            self.statusMessage = "Recording: \(String(text.prefix(50)))\(text.count > 50 ? "..." : "")"
+        }
 
         if !launchConfig.disableHotkeys {
             KeyboardShortcuts.onKeyUp(for: .toggleRecording) { [weak self] in
@@ -66,6 +77,7 @@ final class AppState {
     func cancelRecording() {
         guard isRecording else { return }
         _ = audioRecorder.stopRecording()
+        streamingTranscriptionService?.cancel()
         isRecording = false
         statusMessage = "Ready"
         overlayState.phase = .cancelled
@@ -103,6 +115,8 @@ final class AppState {
 
         do {
             try audioRecorder.startRecording()
+            streamingDidFail = false
+            streamingTranscriptionService?.begin()
             isRecording = true
             statusMessage = "Recording..."
             overlayState.phase = .recording
@@ -132,6 +146,15 @@ final class AppState {
         isRecording = false
         syncCancelRecordingHotkey()
 
+        var streamedText: String?
+        if let streamingTranscriptionService, !streamingDidFail {
+            do {
+                streamedText = try await streamingTranscriptionService.finish()
+            } catch {
+                streamingDidFail = true
+            }
+        }
+
         guard !samples.isEmpty else {
             statusMessage = "No audio captured"
             overlayState.phase = .hidden
@@ -151,11 +174,16 @@ final class AppState {
         overlayState.phase = .transcribing
 
         do {
-            let text = try await transcriptionService.transcribe(
-                audioFrames: samples,
-                modelURL: modelURL,
-                language: modelManager.selectedLanguage
-            )
+            let text: String
+            if let streamedText, !streamedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                text = transcriptionService.filterTranscription(streamedText)
+            } else {
+                text = try await transcriptionService.transcribe(
+                    audioFrames: samples,
+                    modelURL: modelURL,
+                    language: modelManager.selectedLanguage
+                )
+            }
 
             if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 statusMessage = "No speech detected"

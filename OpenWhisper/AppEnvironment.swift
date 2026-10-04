@@ -16,6 +16,7 @@ enum TestScenario: String, CaseIterable {
 @MainActor
 struct AppEnvironment {
     let audioRecorder: AudioRecorder
+    let streamingTranscriptionService: (any StreamingTranscriptionService)?
     let transcriptionService: TranscriptionService
     let pasteService: PasteService
     let modelManager: ModelManager
@@ -48,9 +49,16 @@ struct AppEnvironment {
                 transcriptionService?.vocabularyStore?.learnedTerms ?? []
             }
         )
+        let streamingTranscriptionService: (any StreamingTranscriptionService)?
+        if #available(macOS 26.0, *) {
+            streamingTranscriptionService = AppleStreamingTranscriptionService()
+        } else {
+            streamingTranscriptionService = nil
+        }
 
         return AppEnvironment(
             audioRecorder: AudioRecorder(mode: .live),
+            streamingTranscriptionService: streamingTranscriptionService,
             transcriptionService: transcriptionService,
             pasteService: PasteService(mode: .live, correctionLearningService: correctionLearningService),
             modelManager: modelManager,
@@ -76,6 +84,7 @@ struct AppEnvironment {
         case .launchReadyState:
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: [])),
+                streamingTranscriptionService: nil,
                 transcriptionService: TranscriptionService(mode: .stub(result: "")),
                 pasteService: PasteService(mode: .spy),
                 modelManager: ModelManager(mode: .ready, defaults: defaults),
@@ -86,6 +95,7 @@ struct AppEnvironment {
         case .recordToTranscribeSuccess:
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: Array(repeating: 0.1, count: 16000))),
+                streamingTranscriptionService: nil,
                 transcriptionService: TranscriptionService(mode: .stub(result: "Hello world")),
                 pasteService: PasteService(mode: .spy),
                 modelManager: ModelManager(mode: .ready, defaults: defaults),
@@ -96,6 +106,7 @@ struct AppEnvironment {
         case .noSpeech:
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: Array(repeating: 0.0, count: 16000))),
+                streamingTranscriptionService: nil,
                 transcriptionService: TranscriptionService(mode: .stub(result: "")),
                 pasteService: PasteService(mode: .spy),
                 modelManager: ModelManager(mode: .ready, defaults: defaults),
@@ -106,6 +117,7 @@ struct AppEnvironment {
         case .micDenied:
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: [])),
+                streamingTranscriptionService: nil,
                 transcriptionService: TranscriptionService(mode: .stub(result: "")),
                 pasteService: PasteService(mode: .spy),
                 modelManager: ModelManager(mode: .ready, defaults: defaults),
@@ -116,6 +128,7 @@ struct AppEnvironment {
         case .accessibilityDenied:
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: Array(repeating: 0.1, count: 16000))),
+                streamingTranscriptionService: nil,
                 transcriptionService: TranscriptionService(mode: .stub(result: "Hello world")),
                 pasteService: PasteService(mode: .spy),
                 modelManager: ModelManager(mode: .ready, defaults: defaults),
@@ -126,6 +139,7 @@ struct AppEnvironment {
         case .modelDownloading:
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: [])),
+                streamingTranscriptionService: nil,
                 transcriptionService: TranscriptionService(mode: .stub(result: "")),
                 pasteService: PasteService(mode: .spy),
                 modelManager: ModelManager(mode: .downloading(progress: 0.45), defaults: defaults),
@@ -136,6 +150,7 @@ struct AppEnvironment {
         case .transcriptionError:
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: Array(repeating: 0.1, count: 16000))),
+                streamingTranscriptionService: nil,
                 transcriptionService: TranscriptionService(mode: .stubError),
                 pasteService: PasteService(mode: .spy),
                 modelManager: ModelManager(mode: .ready, defaults: defaults),
@@ -150,6 +165,7 @@ struct AppEnvironment {
             store.add(text: "Third entry")
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: [])),
+                streamingTranscriptionService: nil,
                 transcriptionService: TranscriptionService(mode: .stub(result: "")),
                 pasteService: PasteService(mode: .spy),
                 modelManager: ModelManager(mode: .ready, defaults: defaults),

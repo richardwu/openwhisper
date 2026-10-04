@@ -25,6 +25,7 @@ final class AudioRecorder {
     @ObservationIgnored private var engine: AVAudioEngine?
     @ObservationIgnored private var samples: [Float] = []
     @ObservationIgnored private let sampleRate: Double = 16000
+    @ObservationIgnored var onAudioFrames: (([Float]) -> Void)?
 
     @ObservationIgnored let levelMeter = AudioLevelMeter()
     var recentLevels: [Float] = Array(repeating: 0, count: 30)
@@ -162,6 +163,7 @@ final class AudioRecorder {
 
         Task { @MainActor [weak self] in
             self?.samples.append(contentsOf: floatArray)
+            self?.onAudioFrames?(floatArray)
         }
     }
 }

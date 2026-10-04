@@ -221,6 +221,7 @@ final class TranscriptionBenchmarkTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let state = AppState(environment: AppEnvironment(
             audioRecorder: AudioRecorder(mode: .fixture(samples: samples)),
+            streamingTranscriptionService: nil,
             transcriptionService: service,
             pasteService: PasteService(mode: .spy),
             modelManager: ModelManager(mode: .fixedPath(modelURL), defaults: defaults),

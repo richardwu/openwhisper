@@ -10,7 +10,9 @@ Compare Apple `SpeechAnalyzer` / `SpeechTranscriber`, WhisperKit with a larger m
 
 Do not choose a model from one short recording. The short fixture establishes feasibility, not general dictation quality. A long, human-corrected recording is the next quality input. The user should not need to maintain a word list: discover spellings from approved projects, current context and normal corrections. Apple is the measured latency candidate; WhisperKit and FluidAudio need direct comparison with automatically selected vocabulary.
 
-The investigation adds benchmark tools and a standalone streaming experiment. It does **not** change the production recorder or ship a streaming backend.
+The initial production implementation now uses Apple `SpeechTranscriber` on macOS 26 when its local assets are available. The existing Whisper backend remains the fallback on older macOS versions and when Apple Speech is unavailable. The standalone replay experiment remains the benchmark for capture timing and finalization latency.
+
+The production adapter receives converted microphone frames during recording, reports volatile partial text to the app, and finalizes the same local stream after stop. It does not send audio to a provider. The current Apple path uses Apple's vocabulary and locale assets; the bundled vocabulary prompt remains active in the Whisper fallback.
 
 ## What causes the current behavior
 
