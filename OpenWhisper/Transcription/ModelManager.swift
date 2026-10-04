@@ -29,9 +29,6 @@ enum WhisperModel: String, CaseIterable {
         }
     }
 
-    var statusName: String {
-        displayName.components(separatedBy: " (").first ?? displayName
-    }
 }
 
 enum TranscriptionBackend: String, CaseIterable {
@@ -54,6 +51,10 @@ enum TranscriptionBackend: String, CaseIterable {
         case .whisperSmall: return "Whisper Small (163 MB, fast)"
         case .whisperMedium: return "Whisper Medium (568 MB, highest quality)"
         }
+    }
+
+    var statusName: String {
+        displayName.components(separatedBy: " (").first ?? displayName
     }
 
     var whisperModel: WhisperModel? {

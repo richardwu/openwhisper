@@ -47,7 +47,7 @@ struct SettingsView: View {
                 }
 
                 if appState.modelManager.isModelReady {
-                    Label("(appState.modelManager.selectedBackend.statusName), model ready", systemImage: "checkmark.circle.fill")
+                    Label("\(appState.modelManager.selectedBackend.statusName), model ready", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 } else if appState.modelManager.isDownloading {
                     VStack(alignment: .leading) {
