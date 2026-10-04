@@ -29,6 +29,33 @@ enum WhisperModel: String, CaseIterable {
     }
 }
 
+enum TranscriptionBackend: String, CaseIterable {
+    case appleStreaming
+    case whisperBase
+    case whisperSmall
+    case whisperMedium
+
+    var displayName: String {
+        switch self {
+        case .appleStreaming: return "Apple on-device streaming"
+        case .whisperBase: return "Whisper Base (148 MB, very fast)"
+        case .whisperSmall: return "Whisper Small (163 MB, fast)"
+        case .whisperMedium: return "Whisper Medium (568 MB, highest quality)"
+        }
+    }
+
+    var whisperModel: WhisperModel? {
+        switch self {
+        case .appleStreaming: return nil
+        case .whisperBase: return .base
+        case .whisperSmall: return .small
+        case .whisperMedium: return .medium
+        }
+    }
+
+    var requiresWhisperModel: Bool { whisperModel != nil }
+}
+
 @MainActor
 @Observable
 final class ModelManager {
@@ -43,6 +70,7 @@ final class ModelManager {
 
     private enum DefaultsKey {
         static let selectedModel = "selectedModel"
+        static let selectedBackend = "selectedBackend"
         static let selectedLanguage = "selectedLanguage"
         static let didMigrateToMultilingual = "didMigrateToMultilingual"
     }
@@ -69,6 +97,12 @@ final class ModelManager {
         }
     }
 
+    var selectedBackend: TranscriptionBackend {
+        didSet {
+            defaults.set(selectedBackend.rawValue, forKey: DefaultsKey.selectedBackend)
+        }
+    }
+
     var selectedLanguage: WhisperLanguage {
         didSet {
             defaults.set(selectedLanguage.rawValue, forKey: DefaultsKey.selectedLanguage)
@@ -76,6 +110,7 @@ final class ModelManager {
     }
 
     var isModelReady: Bool {
+        if selectedBackend == .appleStreaming { return true }
         switch mode {
         case .ready:
             return true
@@ -89,6 +124,7 @@ final class ModelManager {
     }
 
     var modelFileURL: URL? {
+        guard let whisperModel = selectedBackend.whisperModel else { return nil }
         switch mode {
         case .fixedPath(let url):
             return FileManager.default.fileExists(atPath: url.path) ? url : nil
@@ -99,7 +135,7 @@ final class ModelManager {
             return nil
         case .live:
             guard let dir = modelsDirectory else { return nil }
-            let path = dir.appendingPathComponent(selectedModel.fileName)
+            let path = dir.appendingPathComponent(whisperModel.fileName)
             if FileManager.default.fileExists(atPath: path.path) {
                 return path
             }
@@ -122,9 +158,12 @@ final class ModelManager {
         self.mode = mode
         self.defaults = defaults
         let storedModel = defaults.string(forKey: DefaultsKey.selectedModel) ?? ""
+        let storedBackend = defaults.string(forKey: DefaultsKey.selectedBackend) ?? ""
         let storedLanguage = defaults.string(forKey: DefaultsKey.selectedLanguage) ?? ""
 
         self.selectedModel = WhisperModel(rawValue: storedModel) ?? .small
+        self.selectedBackend = TranscriptionBackend(rawValue: storedBackend)
+            ?? (WhisperModel(rawValue: storedModel).map { Self.backend(for: $0) } ?? .whisperSmall)
         self.selectedLanguage = WhisperLanguage(rawValue: storedLanguage) ?? .english
 
         // Apply test mode initial state
@@ -152,12 +191,19 @@ final class ModelManager {
     }
 
     func selectModel(_ model: WhisperModel) {
+        selectBackend(Self.backend(for: model))
+    }
+
+    func selectBackend(_ backend: TranscriptionBackend) {
         guard case .live = mode else { return }
         downloadTask?.cancel()
         downloadTask = nil
         downloadGeneration &+= 1
-        selectedModel = model
-        if !isModelReady {
+        selectedBackend = backend
+        if let whisperModel = backend.whisperModel {
+            selectedModel = whisperModel
+        }
+        if backend.requiresWhisperModel && !isModelReady {
             downloadTask = Task {
                 await downloadModel()
             }
@@ -169,6 +215,7 @@ final class ModelManager {
 
     func startDownload() {
         guard case .live = mode else { return }
+        guard selectedBackend.requiresWhisperModel else { return }
         downloadTask?.cancel()
         downloadTask = nil
         downloadGeneration &+= 1
@@ -190,7 +237,8 @@ final class ModelManager {
             return
         }
 
-        let destinationURL = modelsDir.appendingPathComponent(selectedModel.fileName)
+        guard let whisperModel = selectedBackend.whisperModel else { return }
+        let destinationURL = modelsDir.appendingPathComponent(whisperModel.fileName)
 
         isDownloading = true
         downloadProgress = 0
@@ -215,7 +263,7 @@ final class ModelManager {
             defer { session.invalidateAndCancel() }
 
             let (tempURL, response) = try await withTaskCancellationHandler {
-                try await delegate.download(session: session, from: selectedModel.downloadURL)
+                try await delegate.download(session: session, from: whisperModel.downloadURL)
             } onCancel: {
                 session.invalidateAndCancel()
             }
@@ -241,6 +289,14 @@ final class ModelManager {
             guard self.downloadGeneration == generation else { return }
             isDownloading = false
             errorMessage = "Download failed: \(error.localizedDescription)"
+        }
+    }
+
+    private static func backend(for model: WhisperModel) -> TranscriptionBackend {
+        switch model {
+        case .base: return .whisperBase
+        case .small: return .whisperSmall
+        case .medium: return .whisperMedium
         }
     }
 

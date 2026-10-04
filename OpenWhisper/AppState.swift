@@ -91,6 +91,10 @@ final class AppState {
     }
 
     private func startRecording() {
+        if modelManager.selectedBackend == .appleStreaming && streamingTranscriptionService == nil {
+            statusMessage = "Apple streaming is unavailable on this Mac"
+            return
+        }
         guard modelManager.isModelReady else {
             if modelManager.isDownloading {
                 overlayState.phase = .modelDownloading
@@ -116,7 +120,9 @@ final class AppState {
         do {
             try audioRecorder.startRecording()
             streamingDidFail = false
-            streamingTranscriptionService?.begin()
+            if modelManager.selectedBackend == .appleStreaming {
+                streamingTranscriptionService?.begin()
+            }
             isRecording = true
             statusMessage = "Recording..."
             overlayState.phase = .recording
@@ -147,11 +153,16 @@ final class AppState {
         syncCancelRecordingHotkey()
 
         var streamedText: String?
-        if let streamingTranscriptionService, !streamingDidFail {
+        if modelManager.selectedBackend == .appleStreaming,
+           let streamingTranscriptionService, !streamingDidFail {
             do {
                 streamedText = try await streamingTranscriptionService.finish()
             } catch {
                 streamingDidFail = true
+                statusMessage = "Apple streaming error: \(error.localizedDescription)"
+                overlayState.phase = .hidden
+                overlayController?.dismiss()
+                return
             }
         }
 
@@ -162,7 +173,9 @@ final class AppState {
             return
         }
 
-        guard let modelURL = modelManager.modelFileURL, modelManager.isModelReady else {
+        let modelURL = modelManager.modelFileURL
+        if modelManager.selectedBackend.requiresWhisperModel &&
+           (modelURL == nil || !modelManager.isModelReady) {
             statusMessage = "Model not available"
             overlayState.phase = .hidden
             overlayController?.dismiss()
@@ -175,9 +188,15 @@ final class AppState {
 
         do {
             let text: String
-            if let streamedText, !streamedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if modelManager.selectedBackend == .appleStreaming,
+               let streamedText,
+               !streamedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 text = transcriptionService.filterTranscription(streamedText)
             } else {
+                guard let modelURL else {
+                    throw NSError(domain: "OpenWhisper", code: 1,
+                                  userInfo: [NSLocalizedDescriptionKey: "Whisper model is not available"])
+                }
                 text = try await transcriptionService.transcribe(
                     audioFrames: samples,
                     modelURL: modelURL,

@@ -21,12 +21,12 @@ struct SettingsTabView: View {
             }
 
             Section("Model") {
-                Picker("Model", selection: Binding(
-                    get: { appState.modelManager.selectedModel },
-                    set: { appState.modelManager.selectModel($0) }
+                Picker("Transcription", selection: Binding(
+                    get: { appState.modelManager.selectedBackend },
+                    set: { appState.modelManager.selectBackend($0) }
                 )) {
-                    ForEach(WhisperModel.allCases, id: \.self) { model in
-                        Text(model.displayName).tag(model)
+                    ForEach(TranscriptionBackend.allCases, id: \.self) { backend in
+                        Text(backend.displayName).tag(backend)
                     }
                 }
 
@@ -39,7 +39,10 @@ struct SettingsTabView: View {
                     }
                 }
 
-                if appState.modelManager.isModelReady {
+                if appState.modelManager.selectedBackend == .appleStreaming {
+                    Label("Apple on-device streaming ready", systemImage: "waveform.circle.fill")
+                        .foregroundStyle(.green)
+                } else if appState.modelManager.isModelReady {
                     Label("Model ready", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 } else if appState.modelManager.isDownloading {

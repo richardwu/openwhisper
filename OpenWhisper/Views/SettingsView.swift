@@ -37,7 +37,19 @@ struct SettingsView: View {
             }
 
             Section("Model") {
-                if appState.modelManager.isModelReady {
+                Picker("Transcription", selection: Binding(
+                    get: { appState.modelManager.selectedBackend },
+                    set: { appState.modelManager.selectBackend($0) }
+                )) {
+                    ForEach(TranscriptionBackend.allCases, id: \.self) { backend in
+                        Text(backend.displayName).tag(backend)
+                    }
+                }
+
+                if appState.modelManager.selectedBackend == .appleStreaming {
+                    Label("Apple on-device streaming ready", systemImage: "waveform.circle.fill")
+                        .foregroundStyle(.green)
+                } else if appState.modelManager.isModelReady {
                     Label("Model ready", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 } else if appState.modelManager.isDownloading {

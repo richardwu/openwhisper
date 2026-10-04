@@ -41,6 +41,19 @@ final class AppStateTests: XCTestCase {
         XCTAssertNil(manager.modelFileURL)
     }
 
+    func testAppleBackendIsReadyWithoutWhisperModel() {
+        let suiteName = "com.openwhisper.test.backend.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.set(TranscriptionBackend.appleStreaming.rawValue, forKey: "selectedBackend")
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let manager = ModelManager(mode: .missing, defaults: defaults)
+
+        XCTAssertEqual(manager.selectedBackend, .appleStreaming)
+        XCTAssertTrue(manager.isModelReady)
+        XCTAssertNil(manager.modelFileURL)
+    }
+
     // MARK: - Record to Transcribe Success
 
     func testRecordToTranscribeSuccess() async {
