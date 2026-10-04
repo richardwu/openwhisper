@@ -54,7 +54,7 @@ struct MainWindowView: View {
                     .frame(width: 8, height: 8)
                     .opacity(appState.isRecording || appState.isTranscribing ? 1.0 : 0.8)
 
-                Text(appState.statusMessage)
+                Text(footerStatusMessage)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -118,6 +118,16 @@ struct MainWindowView: View {
 
     private var canCopyLatestTranscription: Bool {
         appState.historyStore.entries.first != nil
+    }
+
+    private var footerStatusMessage: String {
+        guard appState.statusMessage == "Ready",
+              let latestText = appState.historyStore.entries.first?.text else {
+            return appState.statusMessage
+        }
+
+        let preview = String(latestText.prefix(50))
+        return "Pasted: \(preview)\(latestText.count > 50 ? "..." : "")"
     }
 
     private func copyLatestTranscription() {

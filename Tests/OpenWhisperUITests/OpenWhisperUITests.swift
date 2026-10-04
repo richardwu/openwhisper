@@ -98,6 +98,8 @@ final class OpenWhisperUITests: XCTestCase {
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 10))
 
+        XCTAssertTrue(window.staticTexts["Pasted: Third entry"].waitForExistence(timeout: 5))
+
         let copyButton = window.buttons["Copy latest transcription"]
         XCTAssertTrue(copyButton.waitForExistence(timeout: 5))
         copyButton.click()
