@@ -39,11 +39,8 @@ struct SettingsTabView: View {
                     }
                 }
 
-                if appState.modelManager.selectedBackend == .appleStreaming {
-                    Label("Apple on-device streaming ready", systemImage: "waveform.circle.fill")
-                        .foregroundStyle(.green)
-                } else if appState.modelManager.isModelReady {
-                    Label("Model ready", systemImage: "checkmark.circle.fill")
+                if appState.modelManager.isModelReady {
+                    Label("(appState.modelManager.selectedBackend.statusName), model ready", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 } else if appState.modelManager.isDownloading {
                     VStack(alignment: .leading) {

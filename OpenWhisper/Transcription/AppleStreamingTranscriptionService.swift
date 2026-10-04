@@ -2,10 +2,12 @@ import AVFoundation
 import CoreMedia
 import Foundation
 import Speech
+import SwiftWhisper
 
 @MainActor
 protocol StreamingTranscriptionService: AnyObject {
     var onPartialText: ((String) -> Void)? { get set }
+    func configure(language: WhisperLanguage)
     func begin()
     func append(audioFrames: [Float])
     func finish() async throws -> String
@@ -18,7 +20,7 @@ protocol StreamingTranscriptionService: AnyObject {
 final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
     var onPartialText: ((String) -> Void)?
 
-    private let locale: Locale
+    private var language: WhisperLanguage
     private let vocabularyStore: VocabularyStore?
     private var startupTask: Task<Void, Error>?
     private var analyzer: SpeechAnalyzer?
@@ -32,9 +34,13 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
     private var frameOffset: Int64 = 0
     private var didFail = false
 
-    init(locale: Locale = Locale(identifier: "en-US"), vocabularyStore: VocabularyStore? = nil) {
-        self.locale = locale
+    init(vocabularyStore: VocabularyStore? = nil) {
+        self.language = .english
         self.vocabularyStore = vocabularyStore
+    }
+
+    func configure(language: WhisperLanguage) {
+        self.language = language
     }
 
     func begin() {
@@ -97,7 +103,7 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
 
     private func prepare() async throws {
         guard SpeechTranscriber.isAvailable,
-              let supportedLocale = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else {
+              let supportedLocale = await SpeechTranscriber.supportedLocale(equivalentTo: language.appleLocale) else {
             didFail = true
             throw NSError(domain: "OpenWhisper.AppleStreaming", code: 2,
                           userInfo: [NSLocalizedDescriptionKey: "SpeechTranscriber is unavailable"])
@@ -192,5 +198,20 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
             volatileText = text
         }
         onPartialText?(finalText + volatileText)
+    }
+}
+
+private extension WhisperLanguage {
+    var appleLocale: Locale {
+        if self == .auto {
+            return Locale.current
+        }
+        if rawValue == "iw" {
+            return Locale(identifier: "he")
+        }
+        if rawValue == "en" {
+            return Locale(identifier: "en-US")
+        }
+        return Locale(identifier: rawValue)
     }
 }

@@ -120,9 +120,10 @@ final class AppState {
         do {
             try audioRecorder.startRecording()
             streamingDidFail = false
-            if modelManager.selectedBackend == .appleStreaming {
-                streamingTranscriptionService?.begin()
-            }
+        if modelManager.selectedBackend == .appleStreaming {
+            streamingTranscriptionService?.configure(language: modelManager.selectedLanguage)
+            streamingTranscriptionService?.begin()
+        }
             isRecording = true
             statusMessage = "Recording..."
             overlayState.phase = .recording

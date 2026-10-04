@@ -28,6 +28,10 @@ enum WhisperModel: String, CaseIterable {
         case .medium: return "Medium (568 MB, not as fast)"
         }
     }
+
+    var statusName: String {
+        displayName.components(separatedBy: " (").first ?? displayName
+    }
 }
 
 enum TranscriptionBackend: String, CaseIterable {
