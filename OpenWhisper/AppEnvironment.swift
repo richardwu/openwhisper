@@ -51,7 +51,7 @@ struct AppEnvironment {
         )
         let streamingTranscriptionService: (any StreamingTranscriptionService)?
         if #available(macOS 26.0, *) {
-            streamingTranscriptionService = AppleStreamingTranscriptionService()
+            streamingTranscriptionService = AppleStreamingTranscriptionService(vocabularyStore: vocabularyStore)
         } else {
             streamingTranscriptionService = nil
         }

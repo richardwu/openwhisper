@@ -20,6 +20,7 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
     var onPartialText: ((String) -> Void)?
 
     private let locale: Locale
+    private let vocabularyStore: VocabularyStore?
     private var startupTask: Task<Void, Error>?
     private var analyzer: SpeechAnalyzer?
     private var transcriber: SpeechTranscriber?
@@ -32,8 +33,9 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
     private var frameOffset: Int64 = 0
     private var didFail = false
 
-    init(locale: Locale = Locale(identifier: "en-US")) {
+    init(locale: Locale = Locale(identifier: "en-US"), vocabularyStore: VocabularyStore? = nil) {
         self.locale = locale
+        self.vocabularyStore = vocabularyStore
     }
 
     func begin() {
@@ -124,6 +126,13 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         }
 
         let analyzer = SpeechAnalyzer(modules: [transcriber])
+        if let vocabularyStore {
+            let context = AnalysisContext()
+            // Apple accepts up to 100 short contextual phrases. Learned terms
+            // come first because VocabularyStore ranks them by confidence.
+            context.contextualStrings[.general] = Array(vocabularyStore.candidateTerms.prefix(100))
+            try await analyzer.setContext(context)
+        }
         try await analyzer.prepareToAnalyze(in: format)
         let (stream, continuation) = AsyncStream<AnalyzerInput>.makeStream()
 
