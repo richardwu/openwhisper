@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import KeyboardShortcuts
 
@@ -20,6 +21,7 @@ struct MainWindowView: View {
     @State private var selectedTab: AppTab = .home
     @State private var micAuthorized = false
     @State private var accessibilityGranted = false
+    @State private var copiedLatestTranscription = false
 
     private let permissionTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
@@ -56,6 +58,19 @@ struct MainWindowView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+
+                if canCopyLatestTranscription {
+                    Button {
+                        copyLatestTranscription()
+                    } label: {
+                        Image(systemName: copiedLatestTranscription ? "checkmark" : "doc.on.doc")
+                            .font(.caption)
+                            .foregroundStyle(copiedLatestTranscription ? .green : .secondary)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(copiedLatestTranscription ? "Latest transcription copied" : "Copy latest transcription")
+                    .help("Copy latest transcription")
+                }
 
                 Spacer()
 
@@ -98,6 +113,21 @@ struct MainWindowView: View {
             return .orange
         } else {
             return .green
+        }
+    }
+
+    private var canCopyLatestTranscription: Bool {
+        appState.historyStore.entries.first != nil
+    }
+
+    private func copyLatestTranscription() {
+        guard let text = appState.historyStore.entries.first?.text else { return }
+        NSPasteboard.general.clearContents()
+        guard NSPasteboard.general.setString(text, forType: .string) else { return }
+
+        copiedLatestTranscription = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            copiedLatestTranscription = false
         }
     }
 

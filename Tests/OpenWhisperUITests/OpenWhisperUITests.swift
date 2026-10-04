@@ -91,4 +91,17 @@ final class OpenWhisperUITests: XCTestCase {
         XCTAssertTrue(window.staticTexts["Second entry"].exists)
         XCTAssertTrue(window.staticTexts["First entry"].exists)
     }
+
+    func testLatestTranscriptionCanBeCopiedFromFooter() {
+        app.launchForTest(scenario: .historyManagement)
+
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+
+        let copyButton = window.buttons["Copy latest transcription"]
+        XCTAssertTrue(copyButton.waitForExistence(timeout: 5))
+        copyButton.click()
+
+        XCTAssertTrue(window.buttons["Latest transcription copied"].waitForExistence(timeout: 2))
+    }
 }
