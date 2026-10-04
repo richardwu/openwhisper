@@ -24,6 +24,7 @@ final class VocabularyStore {
     static let bundledTerms: [String] = [
         // High-value terms that should be available in the default prompt.
         "OpenWhisper", "SwiftUI", "PostgreSQL", "ChatGPT", "Claude", "OpenAI",
+        "NYSE", "NASDAQ", "New York Stock Exchange",
         "TypeScript", "Python", "JavaScript", "GitHub", "Docker", "JSON", "API",
         "SDK", "MCP", "OAuth", "LLM", "PRD", "RFC", "MVP", "OKR", "KPI", "ETA", "TL;DR",
 

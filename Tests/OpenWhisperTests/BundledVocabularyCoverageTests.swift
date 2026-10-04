@@ -6,7 +6,7 @@ final class BundledVocabularyCoverageTests: XCTestCase {
         let terms = Set(VocabularyStore.bundledTerms)
         for expected in [
             "OpenWhisper", "SwiftUI", "PostgreSQL", "ChatGPT",
-            "MCP", "OAuth", "KPI", "TL;DR"
+            "MCP", "OAuth", "KPI", "TL;DR", "NYSE", "NASDAQ"
         ] {
             XCTAssertTrue(terms.contains(expected), "Missing bundled term: \(expected)")
         }

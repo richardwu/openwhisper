@@ -29,6 +29,8 @@ final class VocabularyStoreTests: XCTestCase {
         XCTAssertTrue(prompt.contains("PostgreSQL"))
         XCTAssertTrue(prompt.contains("ChatGPT"))
         XCTAssertTrue(prompt.contains("PRD"))
+        XCTAssertTrue(prompt.contains("NYSE"))
+        XCTAssertTrue(prompt.contains("NASDAQ"))
         XCTAssertLessThanOrEqual(prompt.count, 900)
     }
 
