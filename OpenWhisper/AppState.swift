@@ -1,12 +1,36 @@
 import SwiftUI
 import KeyboardShortcuts
 
+enum RecordingTriggerMode: String, CaseIterable {
+    case toggle
+    case pressAndHold
+
+    var displayName: String {
+        self == .toggle ? "Toggle" : "Press & Hold"
+    }
+
+    var instructionTitle: String {
+        self == .toggle ? "Press your hotkey to start recording" : "Press and hold your hotkey to record"
+    }
+
+    var instructionDetail: String {
+        self == .toggle ? "Press again to stop and transcribe" : "Release to stop and transcribe"
+    }
+}
+
 @MainActor
 @Observable
 final class AppState {
     var isRecording = false
     var statusMessage = "Ready"
     var isTranscribing = false
+    var recordingTriggerMode: RecordingTriggerMode {
+        didSet { defaults.set(recordingTriggerMode.rawValue, forKey: "recordingTriggerMode") }
+    }
+
+    private let defaults: UserDefaults
+    private var activeHotkeyMode: RecordingTriggerMode?
+    private var hotkeyStartedRecording = false
 
     let audioRecorder: AudioRecorder
     let streamingTranscriptionService: (any StreamingTranscriptionService)?
@@ -19,9 +43,16 @@ final class AppState {
     private(set) var overlayController: OverlayController?
 
     private let launchConfig: LaunchConfiguration
+    var isTestMode: Bool { launchConfig.isTestMode }
     private var streamingDidFail = false
+    private var recordingBackend: TranscriptionBackend?
 
     init(environment: AppEnvironment) {
+        let defaults = environment.launchConfig.defaultsSuiteName.flatMap(UserDefaults.init(suiteName:)) ?? .standard
+        self.defaults = defaults
+        self.recordingTriggerMode = RecordingTriggerMode(
+            rawValue: defaults.string(forKey: "recordingTriggerMode") ?? ""
+        ) ?? .toggle
         self.audioRecorder = environment.audioRecorder
         self.streamingTranscriptionService = environment.streamingTranscriptionService
         self.transcriptionService = environment.transcriptionService
@@ -31,11 +62,14 @@ final class AppState {
         self.permissionsClient = environment.permissionsClient
         self.launchConfig = environment.launchConfig
 
-        // Create overlay controller after all properties are initialized
-        overlayController = OverlayController(overlayState: overlayState, audioRecorder: audioRecorder)
+        // Background tests exercise the same recording pipeline without panels.
+        if !launchConfig.isHeadlessTest {
+            overlayController = OverlayController(overlayState: overlayState, audioRecorder: audioRecorder)
+        }
 
-        audioRecorder.onAudioFrames = { [weak streamingTranscriptionService] frames in
-            streamingTranscriptionService?.append(audioFrames: frames)
+        audioRecorder.onAudioFrames = { [weak self] frames in
+            guard let self, self.isRecording else { return }
+            self.streamingTranscriptionService?.append(audioFrames: frames)
         }
         streamingTranscriptionService?.onPartialText = { [weak self] text in
             guard let self, self.isRecording, !text.isEmpty else { return }
@@ -43,10 +77,14 @@ final class AppState {
         }
 
         if !launchConfig.disableHotkeys {
+            KeyboardShortcuts.onKeyDown(for: .toggleRecording) { [weak self] in
+                self?.recordingHotkeyDown()
+            }
+
             KeyboardShortcuts.onKeyUp(for: .toggleRecording) { [weak self] in
                 guard let self else { return }
                 Task { @MainActor in
-                    await self.toggleRecording()
+                    await self.recordingHotkeyUp()
                 }
             }
 
@@ -66,7 +104,28 @@ final class AppState {
         }
     }
 
+    func recordingHotkeyDown() {
+        guard activeHotkeyMode == nil else { return }
+        activeHotkeyMode = recordingTriggerMode
+        guard recordingTriggerMode == .pressAndHold, !isRecording, !isTranscribing else { return }
+        startRecording()
+        hotkeyStartedRecording = isRecording
+    }
+
+    func recordingHotkeyUp() async {
+        guard let mode = activeHotkeyMode else { return }
+        activeHotkeyMode = nil
+        let shouldStop = hotkeyStartedRecording
+        hotkeyStartedRecording = false
+        if mode == .toggle {
+            await toggleRecording()
+        } else if shouldStop && isRecording {
+            await stopRecordingAndTranscribe()
+        }
+    }
+
     func toggleRecording() async {
+        guard !isTranscribing else { return }
         if isRecording {
             await stopRecordingAndTranscribe()
         } else {
@@ -76,8 +135,10 @@ final class AppState {
 
     func cancelRecording() {
         guard isRecording else { return }
+        hotkeyStartedRecording = false
         _ = audioRecorder.stopRecording()
         streamingTranscriptionService?.cancel()
+        recordingBackend = nil
         isRecording = false
         statusMessage = "Ready"
         overlayState.phase = .cancelled
@@ -85,14 +146,15 @@ final class AppState {
 
         // Show "Recording Cancelled" briefly, then dismiss
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+            guard self?.overlayState.phase == .cancelled else { return }
             self?.overlayState.phase = .hidden
             self?.overlayController?.dismiss()
         }
     }
 
     private func startRecording() {
-        if modelManager.selectedBackend == .appleStreaming && streamingTranscriptionService == nil {
-            statusMessage = "Apple streaming is unavailable on this Mac"
+        if modelManager.selectedBackend.isStreamingBackend && streamingTranscriptionService == nil {
+            statusMessage = "Streaming transcription is unavailable on this Mac"
             return
         }
         guard modelManager.isModelReady else {
@@ -113,17 +175,23 @@ final class AppState {
         if !permissionsClient.isMicrophoneAuthorized {
             statusMessage = "Microphone permission required"
             permissionsClient.requestMicrophone()
-            Self.showMainWindow()
+            if !launchConfig.isHeadlessTest {
+                Self.showMainWindow()
+            }
             return
         }
 
         do {
             try audioRecorder.startRecording()
+            recordingBackend = modelManager.selectedBackend
             streamingDidFail = false
-        if modelManager.selectedBackend == .appleStreaming {
-            streamingTranscriptionService?.configure(language: modelManager.selectedLanguage)
-            streamingTranscriptionService?.begin()
-        }
+            if modelManager.selectedBackend.isStreamingBackend {
+                streamingTranscriptionService?.configure(
+                    language: modelManager.selectedLanguage,
+                    modelURL: modelManager.modelFileURL
+                )
+                streamingTranscriptionService?.begin()
+            }
             isRecording = true
             statusMessage = "Recording..."
             overlayState.phase = .recording
@@ -135,6 +203,7 @@ final class AppState {
     }
 
     static func showMainWindow() {
+        guard !LaunchConfiguration.current.isHeadlessTest else { return }
         NSApp.setActivationPolicy(.regular)
         NSApplication.shared.activate(ignoringOtherApps: true)
         for window in NSApplication.shared.windows {
@@ -149,18 +218,27 @@ final class AppState {
     }
 
     private func stopRecordingAndTranscribe() async {
+        let backend = recordingBackend ?? modelManager.selectedBackend
         let samples = audioRecorder.stopRecording()
         isRecording = false
         syncCancelRecordingHotkey()
 
+        isTranscribing = true
+        statusMessage = "Processing..."
+        overlayState.phase = .transcribing
+        defer {
+            isTranscribing = false
+            recordingBackend = nil
+        }
+
         var streamedText: String?
-        if modelManager.selectedBackend == .appleStreaming,
+        if backend.isStreamingBackend,
            let streamingTranscriptionService, !streamingDidFail {
             do {
                 streamedText = try await streamingTranscriptionService.finish()
             } catch {
                 streamingDidFail = true
-                statusMessage = "Apple streaming error: \(error.localizedDescription)"
+                statusMessage = "\(backend.statusName) error: \(error.localizedDescription)"
                 overlayState.phase = .hidden
                 overlayController?.dismiss()
                 return
@@ -175,7 +253,11 @@ final class AppState {
         }
 
         let modelURL = modelManager.modelFileURL
-        if modelManager.selectedBackend.requiresWhisperModel &&
+        // Streaming backends own their loaded model inside the streaming
+        // service. Their `modelFileURL` is intentionally nil (Apple and
+        // FluidAudio) even after a successful finish; only batch Whisper and
+        // GGUF backends require a file URL here.
+        if !backend.isStreamingBackend &&
            (modelURL == nil || !modelManager.isModelReady) {
             statusMessage = "Model not available"
             overlayState.phase = .hidden
@@ -183,16 +265,13 @@ final class AppState {
             return
         }
 
-        isTranscribing = true
-        statusMessage = "Transcribing..."
-        overlayState.phase = .transcribing
-
         do {
             let text: String
-            if modelManager.selectedBackend == .appleStreaming,
-               let streamedText,
-               !streamedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                text = transcriptionService.filterTranscription(streamedText)
+            if backend.isStreamingBackend {
+                // Streaming backends finish the same native stream that ran
+                // during capture. An empty result means silence; never start
+                // a second Whisper pass after the user stopped recording.
+                text = await transcriptionService.finalizeTranscription(streamedText ?? "")
             } else {
                 guard let modelURL else {
                     throw NSError(domain: "OpenWhisper", code: 1,

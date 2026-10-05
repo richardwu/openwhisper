@@ -4,12 +4,14 @@ import KeyboardShortcuts
 
 enum AppTab: String, CaseIterable {
     case home = "Home"
-    case settings = "Settings"
     case history = "History"
+    case vocabulary = "Vocabulary"
+    case settings = "Settings"
 
     var icon: String {
         switch self {
         case .home: return "house"
+        case .vocabulary: return "text.book.closed"
         case .settings: return "gear"
         case .history: return "clock"
         }
@@ -25,11 +27,17 @@ struct MainWindowView: View {
 
     private let permissionTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
+    init(appState: AppState, initialTab: AppTab = .home) {
+        self.appState = appState
+        _selectedTab = State(initialValue: initialTab)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             NavigationSplitView {
                 List(AppTab.allCases, id: \.self, selection: $selectedTab) { tab in
                     Label(tab.rawValue, systemImage: tab.icon)
+                        .accessibilityIdentifier("navigation.\(String(describing: tab))")
                 }
                 .navigationSplitViewColumnWidth(min: 150, ideal: 160, max: 180)
             } detail: {
@@ -37,6 +45,8 @@ struct MainWindowView: View {
                     switch selectedTab {
                     case .home:
                         homeTab
+                    case .vocabulary:
+                        VocabularyTabView(appState: appState)
                     case .settings:
                         SettingsTabView(appState: appState)
                     case .history:
@@ -58,6 +68,7 @@ struct MainWindowView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .accessibilityIdentifier("footer.status")
 
                 Spacer()
 
@@ -86,13 +97,14 @@ struct MainWindowView: View {
                     .buttonStyle(.borderless)
                     .accessibilityLabel(copiedLatestTranscription ? "Latest transcription copied" : "Copy latest transcription")
                     .help("Copy latest transcription")
+                    .accessibilityIdentifier("footer.copy")
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
         }
-        .frame(minWidth: 580, maxWidth: 700, minHeight: 420, maxHeight: 640)
+        .frame(minWidth: 580, idealWidth: 620, maxWidth: 700, minHeight: 420, idealHeight: 640, maxHeight: .infinity)
         .onReceive(permissionTimer) { _ in
             refreshPermissions()
         }
@@ -161,6 +173,19 @@ struct MainWindowView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 12)
 
+                if appState.isTestMode {
+                    HStack {
+                        Button(appState.isRecording ? "Stop Recording" : "Start Recording") {
+                            Task { await appState.toggleRecording() }
+                        }
+                        .accessibilityIdentifier("recording.toggle")
+                        Button("Cancel Recording") { appState.cancelRecording() }
+                            .disabled(!appState.isRecording)
+                            .accessibilityIdentifier("recording.cancel")
+                    }
+                    .padding(.bottom, 12)
+                }
+
                 // Permission banners
                 if !micAuthorized || !accessibilityGranted {
                     VStack(spacing: 8) {
@@ -196,8 +221,8 @@ struct MainWindowView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     instructionRow(
                         step: 1,
-                        title: "Press your hotkey to start recording",
-                        detail: "Press again to stop and transcribe"
+                        title: appState.recordingTriggerMode.instructionTitle,
+                        detail: appState.recordingTriggerMode.instructionDetail
                     )
                     instructionRow(
                         step: 2,
@@ -217,7 +242,7 @@ struct MainWindowView: View {
                 Divider()
 
                 HStack(spacing: 24) {
-                    hotkeyLabel("Start/stop", for: .toggleRecording)
+                    hotkeyLabel(appState.recordingTriggerMode == .toggle ? "Start/stop" : "Hold to record", for: .toggleRecording)
                     hotkeyLabel("Cancel recording", for: .cancelRecording)
                 }
                 .padding(.horizontal, 24)

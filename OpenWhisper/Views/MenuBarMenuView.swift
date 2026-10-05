@@ -10,7 +10,7 @@ struct MenuBarMenuView: View {
         if appState.isRecording {
             Text("Recording...")
         } else if appState.isTranscribing {
-            Text("Transcribing...")
+            Text("Processing...")
         } else if !appState.modelManager.isModelReady {
             if appState.modelManager.isDownloading {
                 Text("Downloading model (\(Int(appState.modelManager.downloadProgress * 100))%)...")
@@ -49,7 +49,8 @@ struct MenuBarMenuView: View {
         }
         .disabled(!appState.modelManager.isModelReady || appState.isTranscribing)
 
-        if let shortcut = KeyboardShortcuts.getShortcut(for: .toggleRecording),
+        if appState.recordingTriggerMode == .toggle,
+           let shortcut = KeyboardShortcuts.getShortcut(for: .toggleRecording),
            let keyEquiv = shortcut.swiftUIKeyEquivalent {
             button.keyboardShortcut(keyEquiv, modifiers: shortcut.swiftUIModifiers)
         } else {

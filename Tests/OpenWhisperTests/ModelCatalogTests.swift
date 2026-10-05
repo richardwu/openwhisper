@@ -1,0 +1,247 @@
+import XCTest
+import SwiftWhisper
+@testable import OpenWhisper
+
+final class ModelCatalogTests: XCTestCase {
+    func testLargeModelUsesAWhisperCppCheckpointSupportedByTheBundledRuntime() {
+        XCTAssertEqual(WhisperModel.large.fileName, "ggml-large-v2-q5_0.bin")
+        XCTAssertEqual(WhisperModel.large.downloadURL.host, "huggingface.co")
+        XCTAssertEqual(
+            WhisperModel.large.downloadURL.path,
+            "/ggerganov/whisper.cpp/resolve/main/ggml-large-v2-q5_0.bin"
+        )
+        XCTAssertEqual(TranscriptionBackend.whisperLarge.whisperModel, .large)
+        XCTAssertTrue(TranscriptionBackend.whisperLarge.requiresWhisperModel)
+    }
+
+    func testEverySelectableWhisperModelHasAStableDownloadMetadata() {
+        for model in WhisperModel.allCases {
+            XCTAssertTrue(model.fileName.hasSuffix(".bin"), model.rawValue)
+            XCTAssertEqual(model.downloadURL.host, "huggingface.co", model.rawValue)
+            XCTAssertTrue(model.downloadURL.path.contains("/whisper.cpp/resolve/main/"), model.rawValue)
+        }
+    }
+
+    func testMoonshineStreamingUsesTheHandyGGUFCheckpoint() {
+        let model = TranscribeCppModel.moonshineStreamingSmall
+        XCTAssertEqual(model.fileName, "moonshine-streaming-small-Q8_0.gguf")
+        XCTAssertEqual(model.downloadURL.host, "huggingface.co")
+        XCTAssertTrue(model.downloadURL.path.contains("moonshine-streaming-small-gguf"))
+        XCTAssertTrue(TranscriptionBackend.moonshineStreamingSmall.isStreamingBackend)
+        XCTAssertTrue(TranscriptionBackend.moonshineStreamingSmall.requiresModel)
+        XCTAssertNil(TranscriptionBackend.moonshineStreamingSmall.whisperModel)
+        XCTAssertEqual(
+            TranscriptionBackend.moonshineStreamingSmall.transcribeCppModel,
+            .moonshineStreamingSmall
+        )
+    }
+
+    @MainActor
+    func testMoonshineSelectionExposesItsGGUFPathWhenReady() {
+        let suiteName = "com.openwhisper.test.moonshine.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.set(TranscriptionBackend.moonshineStreamingSmall.rawValue, forKey: "selectedBackend")
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let manager = ModelManager(mode: .ready, defaults: defaults)
+        XCTAssertEqual(manager.selectedBackend, .moonshineStreamingSmall)
+        XCTAssertTrue(manager.isModelReady)
+        XCTAssertEqual(manager.modelFileURL?.path, "/tmp/test-model.bin")
+        XCTAssertEqual(manager.selectedLanguage, .english)
+    }
+
+    @MainActor
+    func testPersistedLargeSelectionMapsToTheLargeBackend() {
+        let suiteName = "com.openwhisper.test.model-catalog.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.set(WhisperModel.large.rawValue, forKey: "selectedModel")
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let manager = ModelManager(mode: .missing, defaults: defaults)
+        XCTAssertEqual(manager.selectedBackend, .whisperLarge)
+        XCTAssertEqual(manager.selectedModel, .large)
+        XCTAssertFalse(manager.isModelReady)
+    }
+
+    func testPendingHandyModelsAreCatalogedButNotSelectable() {
+        let pendingModels = LocalModelCatalog.pendingHandyModels
+        let selectableNames = Set(TranscriptionBackend.allCases.map(\.displayName))
+        let pendingIDs = Set(pendingModels.map(\.identifier))
+        XCTAssertEqual(
+            pendingIDs,
+            ["parakeet-v3", "sensevoice", "canary", "gigaam", "breeze-asr"]
+        )
+        XCTAssertTrue(pendingModels.allSatisfy { !$0.reasonUnavailable.isEmpty })
+        for model in pendingModels {
+            XCTAssertFalse(selectableNames.contains(model.displayName), model.identifier)
+        }
+        XCTAssertTrue(TranscriptionBackend.allCases.contains(.parakeetUnified))
+        XCTAssertTrue(TranscriptionBackend.allCases.contains(.moonshineStreamingTiny))
+        XCTAssertTrue(TranscriptionBackend.allCases.contains(.moonshineStreamingSmall))
+        XCTAssertTrue(TranscriptionBackend.allCases.contains(.moonshineStreamingMedium))
+        XCTAssertTrue(TranscriptionBackend.allCases.contains(.nemotronSpeechStreaming))
+        XCTAssertTrue(TranscriptionBackend.allCases.contains(.nemotron35Streaming))
+        XCTAssertTrue(TranscriptionBackend.allCases.contains(.voxtralMiniRealtime))
+        XCTAssertTrue(TranscriptionBackend.allCases.contains(.multitalkerParakeetStreaming))
+    }
+
+    func testSupportedHandyModelsIncludeEveryStreamingFamily() {
+        XCTAssertTrue(TranscriptionBackend.parakeetUnified.isStreamingBackend)
+        XCTAssertTrue(TranscriptionBackend.parakeetUnified.isEnglishOnly)
+        XCTAssertFalse(TranscriptionBackend.parakeetUnified.requiresWhisperModel)
+        XCTAssertEqual(
+            LocalModelCatalog.supportedHandyModels.map(\.identifier),
+            [
+                "parakeet-unified",
+                "moonshine-streaming-tiny",
+                "moonshine-streaming-small",
+                "moonshine-streaming-medium",
+                "nemotron-speech-streaming-en-0.6b",
+                "nemotron-3.5-asr-streaming-0.6b",
+                "voxtral-mini-4b-realtime",
+                "multitalker-parakeet-streaming-0.6b-v1",
+            ]
+        )
+    }
+
+    func testFluidAudioCacheMatchesTheParakeetUnifiedRepository() {
+        XCTAssertEqual(
+            FluidAudioModelSupport.repositoryName,
+            "parakeet-unified-en-0.6b"
+        )
+        XCTAssertTrue(
+            FluidAudioModelSupport.requiredFiles.contains(
+                "parakeet_unified_encoder_streaming_70_13_13_int8.mlmodelc"
+            )
+        )
+        XCTAssertTrue(FluidAudioModelSupport.requiredFiles.contains("vocab.json"))
+    }
+
+    func testTranscribeCppVariantsUseHandyGGUFDownloads() {
+        XCTAssertEqual(
+            TranscribeCppModel.allCases.map(\.fileName),
+            [
+                "moonshine-streaming-tiny-Q8_0.gguf",
+                "moonshine-streaming-small-Q8_0.gguf",
+                "moonshine-streaming-medium-Q8_0.gguf",
+                "nemotron-speech-streaming-en-0.6b-Q4_K_M.gguf",
+                "nemotron-3.5-asr-streaming-0.6b-Q4_K_M.gguf",
+                "Voxtral-Mini-4B-Realtime-2602-Q4_K_M.gguf",
+                "multitalker-parakeet-streaming-0.6b-v1-Q4_K_M.gguf",
+            ]
+        )
+        for model in TranscribeCppModel.allCases {
+            XCTAssertEqual(model.downloadURL.host, "huggingface.co")
+            XCTAssertTrue(model.downloadURL.path.contains("handy-computer"))
+        }
+
+        XCTAssertTrue(
+            TranscribeCppModel.multitalkerParakeetStreaming.downloadURL.path.contains("/bundle/")
+        )
+        XCTAssertTrue(
+            TranscribeCppModel.nemotronSpeechStreaming.downloadURL.path.contains(
+                "nemotron-speech-streaming-en-0.6b-gguf"
+            )
+        )
+        XCTAssertTrue(
+            TranscribeCppModel.nemotron35Streaming.downloadURL.path.contains(
+                "nemotron-3.5-asr-streaming-0.6b-gguf"
+            )
+        )
+        XCTAssertTrue(
+            TranscribeCppModel.voxtralMiniRealtime.downloadURL.path.contains("Voxtral-Mini-4B-Realtime-2602-gguf")
+        )
+    }
+
+    func testAdditionalStreamingModelsExposeTheirRuntimeFamilies() {
+        if case .some(.nemotronSpeechStreaming) = TranscriptionBackend.nemotronSpeechStreaming.transcribeCppStreamFamily {
+        } else {
+            XCTFail("Nemotron Speech must use the parakeet stream extension")
+        }
+        if case .some(.nemotron35Streaming) = TranscriptionBackend.nemotron35Streaming.transcribeCppStreamFamily {
+        } else {
+            XCTFail("Nemotron 3.5 must use its locale-aware stream family")
+        }
+        if case .some(.voxtralRealtime) = TranscriptionBackend.voxtralMiniRealtime.transcribeCppStreamFamily {
+        } else {
+            XCTFail("Voxtral must use the realtime stream extension")
+        }
+        if case .some(.multitalkerParakeetStreaming) = TranscriptionBackend.multitalkerParakeetStreaming.transcribeCppStreamFamily {
+        } else {
+            XCTFail("Multitalker Parakeet must use the parakeet stream extension")
+        }
+        XCTAssertTrue(TranscriptionBackend.nemotronSpeechStreaming.isEnglishOnly)
+        XCTAssertFalse(TranscriptionBackend.nemotron35Streaming.isEnglishOnly)
+        XCTAssertTrue(TranscriptionBackend.voxtralMiniRealtime.isStreamingBackend)
+        XCTAssertFalse(TranscriptionBackend.voxtralMiniRealtime.isEnglishOnly)
+        XCTAssertTrue(TranscriptionBackend.multitalkerParakeetStreaming.isEnglishOnly)
+        XCTAssertEqual(
+            TranscriptionBackend.nemotron35Streaming.supportedLanguageOptions,
+            [
+                .auto, .english, .chinese, .german, .spanish, .russian, .korean,
+                .french, .japanese, .portuguese, .turkish, .polish, .dutch,
+                .arabic, .swedish, .italian, .hindi, .ukrainian, .czech,
+                .romanian, .danish, .hungarian, .thai, .vietnamese, .slovak,
+                .bulgarian, .lithuanian, .latvian, .estonian, .norwegian,
+            ]
+        )
+    }
+
+    @MainActor
+    func testPersistedParakeetSelectionForcesEnglish() {
+        let suiteName = "com.openwhisper.test.parakeet-language.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.set(TranscriptionBackend.parakeetUnified.rawValue, forKey: "selectedBackend")
+        defaults.set(WhisperLanguage.japanese.rawValue, forKey: "selectedLanguage")
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let manager = ModelManager(mode: .live, defaults: defaults)
+        XCTAssertEqual(manager.selectedBackend, .parakeetUnified)
+        XCTAssertEqual(manager.selectedLanguage, .english)
+    }
+
+    @MainActor
+    func testStreamingRouterDispatchesToTheSelectedBackend() async throws {
+        var selected: TranscriptionBackend = .parakeetUnified
+        let parakeet = RecordingStreamingService(result: "parakeet")
+        let moonshine = RecordingStreamingService(result: "moonshine")
+        let router = BackendStreamingTranscriptionService(
+            selectedBackend: { selected },
+            services: [
+                .parakeetUnified: parakeet,
+                .moonshineStreamingSmall: moonshine,
+            ]
+        )
+
+        router.configure(language: .english, modelURL: nil)
+        router.begin()
+        router.append(audioFrames: [0.1, 0.2])
+        let parakeetResult = try await router.finish()
+        XCTAssertEqual(parakeetResult, "parakeet")
+        XCTAssertEqual(parakeet.beginCount, 1)
+        XCTAssertEqual(moonshine.beginCount, 0)
+
+        selected = .moonshineStreamingSmall
+        router.begin()
+        let moonshineResult = try await router.finish()
+        XCTAssertEqual(moonshineResult, "moonshine")
+        XCTAssertEqual(moonshine.beginCount, 1)
+    }
+}
+
+@MainActor
+private final class RecordingStreamingService: StreamingTranscriptionService {
+    var onPartialText: ((String) -> Void)?
+    let result: String
+    var beginCount = 0
+
+    init(result: String) {
+        self.result = result
+    }
+
+    func configure(language: WhisperLanguage) {}
+    func begin() { beginCount += 1 }
+    func append(audioFrames: [Float]) {}
+    func finish() async throws -> String { result }
+    func cancel() {}
+}

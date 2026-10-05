@@ -50,6 +50,8 @@ On first launch of a dev build the app will download the Whisper model (~148 MB)
 - **Microphone** access (prompted automatically)
 - **Accessibility** access (System Settings > Privacy & Security > Accessibility) for auto-paste
 
+Run `scripts/test_background.sh` for checks without cursor input or visible windows. See [UI testing](docs/ui-testing.md) for native click tests, real-model checks and coverage boundaries.
+
 ## Usage
 
 1. Click the waveform icon in the menu bar, or use the global hotkey
@@ -64,7 +66,7 @@ On first launch of a dev build the app will download the Whisper model (~148 MB)
 | Start/stop recording | `Cmd+'` |
 | Cancel recording | `Escape` |
 
-Hotkeys can be customized in the main window's settings tab.
+Hotkeys can be customized in the main window's settings tab. Choose **Toggle** (default) to press once to start and again to stop, or **Press & Hold** to record while holding the hotkey and transcribe on release.
 
 ## Pre-built Binaries
 

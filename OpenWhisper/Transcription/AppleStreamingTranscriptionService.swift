@@ -4,16 +4,6 @@ import Foundation
 import Speech
 import SwiftWhisper
 
-@MainActor
-protocol StreamingTranscriptionService: AnyObject {
-    var onPartialText: ((String) -> Void)? { get set }
-    func configure(language: WhisperLanguage)
-    func begin()
-    func append(audioFrames: [Float])
-    func finish() async throws -> String
-    func cancel()
-}
-
 /// Uses the macOS 26 on-device SpeechTranscriber while the microphone is recording.
 @available(macOS 26.0, *)
 @MainActor
@@ -33,6 +23,9 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
     private var volatileText = ""
     private var frameOffset: Int64 = 0
     private var didFail = false
+    private var lastPartial = ""
+    private var acceptingFrames = false
+    private var generation = 0
 
     init(vocabularyStore: VocabularyStore? = nil) {
         self.language = .english
@@ -57,19 +50,27 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
 
     func begin() {
         cancel()
+        let currentGeneration = generation
+        acceptingFrames = true
         pendingFrames = []
         finalText = ""
         volatileText = ""
         frameOffset = 0
         didFail = false
+        lastPartial = ""
         startupTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            try await self.prepare()
+            do {
+                try await self.prepare(generation: currentGeneration)
+            } catch {
+                if currentGeneration == generation { didFail = true }
+                throw error
+            }
         }
     }
 
     func append(audioFrames: [Float]) {
-        guard !audioFrames.isEmpty, !didFail else { return }
+        guard acceptingFrames, !audioFrames.isEmpty, !didFail else { return }
         guard let continuation, let audioFormat else {
             pendingFrames.append(audioFrames)
             return
@@ -78,7 +79,11 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
     }
 
     func finish() async throws -> String {
+        acceptingFrames = false
+        let currentGeneration = generation
+        defer { if currentGeneration == generation { cancel() } }
         try await startupTask?.value
+        try checkSession(generation: currentGeneration)
 
         if let continuation, let audioFormat {
             for frames in pendingFrames {
@@ -90,7 +95,9 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         continuation = nil
 
         try await analyzer?.finalizeAndFinishThroughEndOfInput()
+        try checkSession(generation: currentGeneration)
         await resultsTask?.value
+        try checkSession(generation: currentGeneration)
         resultsTask = nil
 
         guard !didFail else {
@@ -101,6 +108,8 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
     }
 
     func cancel() {
+        generation &+= 1
+        acceptingFrames = false
         startupTask?.cancel()
         startupTask = nil
         continuation?.finish()
@@ -111,15 +120,24 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         transcriber = nil
         audioFormat = nil
         pendingFrames.removeAll(keepingCapacity: false)
+        finalText = ""
+        volatileText = ""
+        lastPartial = ""
     }
 
-    private func prepare() async throws {
+    private func checkSession(generation: Int) throws {
+        try Task.checkCancellation()
+        guard generation == self.generation else { throw CancellationError() }
+    }
+
+    private func prepare(generation: Int) async throws {
+        try checkSession(generation: generation)
         guard SpeechTranscriber.isAvailable,
               let supportedLocale = await SpeechTranscriber.supportedLocale(equivalentTo: language.appleLocale) else {
-            didFail = true
             throw NSError(domain: "OpenWhisper.AppleStreaming", code: 2,
                           userInfo: [NSLocalizedDescriptionKey: "SpeechTranscriber is unavailable"])
         }
+        try checkSession(generation: generation)
 
         let transcriber = SpeechTranscriber(
             locale: supportedLocale,
@@ -129,18 +147,20 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         )
 
         if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+            try checkSession(generation: generation)
             try await request.downloadAndInstall()
         }
+        try checkSession(generation: generation)
 
         guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(
             compatibleWith: [transcriber],
             considering: AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000,
                                        channels: 1, interleaved: false)
         ) else {
-            didFail = true
             throw NSError(domain: "OpenWhisper.AppleStreaming", code: 3,
                           userInfo: [NSLocalizedDescriptionKey: "No compatible speech audio format"])
         }
+        try checkSession(generation: generation)
 
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         if let vocabularyStore {
@@ -149,8 +169,10 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
             // come first because VocabularyStore ranks them by confidence.
             context.contextualStrings[.general] = Array(vocabularyStore.candidateTerms.prefix(100))
             try await analyzer.setContext(context)
+            try checkSession(generation: generation)
         }
         try await analyzer.prepareToAnalyze(in: format)
+        try checkSession(generation: generation)
         let (stream, continuation) = AsyncStream<AnalyzerInput>.makeStream()
 
         self.transcriber = transcriber
@@ -160,14 +182,16 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         resultsTask = Task { [weak self, transcriber] in
             do {
                 for try await result in transcriber.results {
-                    await MainActor.run { self?.consume(result) }
+                    guard !Task.isCancelled, self?.generation == generation else { return }
+                    self?.consume(result)
                 }
             } catch {
-                await MainActor.run { self?.didFail = true }
+                if self?.generation == generation { self?.didFail = true }
             }
         }
 
         try await analyzer.start(inputSequence: stream)
+        try checkSession(generation: generation)
 
         if let continuation = self.continuation, let format = self.audioFormat {
             for frames in pendingFrames {
@@ -209,7 +233,10 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         } else {
             volatileText = text
         }
-        onPartialText?(finalText + volatileText)
+        let partial = finalText + volatileText
+        guard !partial.isEmpty, partial != lastPartial else { return }
+        lastPartial = partial
+        onPartialText?(partial)
     }
 }
 

@@ -9,6 +9,11 @@ struct LaunchConfiguration {
     let disableHotkeys: Bool
     let modelPath: String?
 
+    /// Only fixture runs can opt out of all application presentation.
+    var isHeadlessTest: Bool {
+        isTestMode && ProcessInfo.processInfo.environment["OPENWHISPER_HEADLESS_TESTS"] == "1"
+    }
+
     static var current: LaunchConfiguration {
         let env = ProcessInfo.processInfo.environment
         let isTest = env["OPENWHISPER_TEST_MODE"] == "1"

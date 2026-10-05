@@ -11,12 +11,17 @@ packages:
   SwiftWhisper:
     url: https://github.com/exPHAT/SwiftWhisper.git
     branch: fast
+  TranscribeCpp:
+    path: Vendor/TranscribeCpp
   KeyboardShortcuts:
     url: https://github.com/sindresorhus/KeyboardShortcuts
     from: "2.4.0"
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     exactVersion: "2.8.1"
+  FluidAudio:
+    url: https://github.com/FluidInference/FluidAudio.git
+    exactVersion: "0.17.5"
 
 targets:
   OpenWhisper:
@@ -47,8 +52,10 @@ targets:
           PRODUCT_MODULE_NAME: OpenWhisper
     dependencies:
       - package: SwiftWhisper
+      - package: TranscribeCpp
       - package: KeyboardShortcuts
       - package: Sparkle
+      - package: FluidAudio
     info:
       path: OpenWhisper/Info.plist
       properties:

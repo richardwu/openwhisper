@@ -7,12 +7,16 @@ enum WhisperModel: String, CaseIterable {
     case base
     case small
     case medium
+    /// Whisper large-v2, quantized to q5_0. The bundled SwiftWhisper runtime
+    /// does not support newer large-v3 or turbo checkpoints.
+    case large
 
     var fileName: String {
         switch self {
         case .base:   return "ggml-base.bin"
         case .small:  return "ggml-small-q5_1.bin"
         case .medium: return "ggml-medium-q5_0.bin"
+        case .large:  return "ggml-large-v2-q5_0.bin"
         }
     }
 
@@ -26,16 +30,93 @@ enum WhisperModel: String, CaseIterable {
         case .base:   return "Base (148 MB, very fast)"
         case .small:  return "Small (163 MB, fast)"
         case .medium: return "Medium (568 MB, not as fast)"
+        case .large:  return "Large (1.1 GB, highest quality)"
         }
     }
 
 }
 
+/// GGUF models loaded by Handy's local transcribe.cpp runtime.
+enum TranscribeCppModel: String, CaseIterable {
+    case moonshineStreamingTiny
+    case moonshineStreamingSmall
+    case moonshineStreamingMedium
+    case nemotronSpeechStreaming
+    case nemotron35Streaming
+    case voxtralMiniRealtime
+    case multitalkerParakeetStreaming
+
+    var fileName: String {
+        switch self {
+        case .moonshineStreamingTiny: return "moonshine-streaming-tiny-Q8_0.gguf"
+        case .moonshineStreamingSmall: return "moonshine-streaming-small-Q8_0.gguf"
+        case .moonshineStreamingMedium: return "moonshine-streaming-medium-Q8_0.gguf"
+        case .nemotronSpeechStreaming:
+            return "nemotron-speech-streaming-en-0.6b-Q4_K_M.gguf"
+        case .nemotron35Streaming:
+            return "nemotron-3.5-asr-streaming-0.6b-Q4_K_M.gguf"
+        case .voxtralMiniRealtime:
+            return "Voxtral-Mini-4B-Realtime-2602-Q4_K_M.gguf"
+        case .multitalkerParakeetStreaming:
+            return "multitalker-parakeet-streaming-0.6b-v1-Q4_K_M.gguf"
+        }
+    }
+
+    var downloadURL: URL {
+        switch self {
+        case .moonshineStreamingTiny,
+             .moonshineStreamingSmall,
+             .moonshineStreamingMedium:
+            let slug: String
+            switch self {
+            case .moonshineStreamingTiny: slug = "moonshine-streaming-tiny"
+            case .moonshineStreamingSmall: slug = "moonshine-streaming-small"
+            case .moonshineStreamingMedium: slug = "moonshine-streaming-medium"
+            default: fatalError("unreachable")
+            }
+            return URL(string: "https://huggingface.co/handy-computer/\(slug)-gguf/resolve/main/\(fileName)")!
+        case .nemotronSpeechStreaming:
+            return URL(string: "https://huggingface.co/handy-computer/nemotron-speech-streaming-en-0.6b-gguf/resolve/main/\(fileName)")!
+        case .nemotron35Streaming:
+            return URL(string: "https://huggingface.co/handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/\(fileName)")!
+        case .voxtralMiniRealtime:
+            return URL(string: "https://huggingface.co/handy-computer/Voxtral-Mini-4B-Realtime-2602-gguf/resolve/main/\(fileName)")!
+        case .multitalkerParakeetStreaming:
+            return URL(string: "https://huggingface.co/handy-computer/multitalker-parakeet-streaming-0.6b-v1-gguf/resolve/main/bundle/\(fileName)")!
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .moonshineStreamingTiny: return "Moonshine Tiny (50 MB, streaming)"
+        case .moonshineStreamingSmall: return "Moonshine Small (199 MB, streaming)"
+        case .moonshineStreamingMedium: return "Moonshine Medium (296 MB, streaming)"
+        case .nemotronSpeechStreaming:
+            return "Nemotron Speech EN 0.6B (475 MB, streaming)"
+        case .nemotron35Streaming:
+            return "Nemotron 3.5 ASR 0.6B (496 MB, streaming)"
+        case .voxtralMiniRealtime:
+            return "Voxtral Mini 4B Realtime (2.8 GB, streaming)"
+        case .multitalkerParakeetStreaming:
+            return "Multitalker Parakeet 0.6B (617 MB, streaming)"
+        }
+    }
+}
+
 enum TranscriptionBackend: String, CaseIterable {
     case appleStreaming
+    case parakeetUnified
+    case moonshineStreamingTiny
+    case moonshineStreamingSmall
+    case moonshineStreamingMedium
+    case nemotronSpeechStreaming
+    case nemotron35Streaming
+    case voxtralMiniRealtime
+    case multitalkerParakeetStreaming
     case whisperBase
     case whisperSmall
     case whisperMedium
+    case whisperLarge
 
     static var preferredDefault: Self {
         if #available(macOS 26.0, *), SpeechTranscriber.isAvailable {
@@ -46,10 +127,19 @@ enum TranscriptionBackend: String, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .appleStreaming: return "Apple (streaming)"
-        case .whisperBase: return "Whisper Base (148 MB, very fast)"
-        case .whisperSmall: return "Whisper Small (163 MB, fast)"
-        case .whisperMedium: return "Whisper Medium (568 MB, highest quality)"
+        case .appleStreaming: return "Apple (Built-in, streaming)"
+        case .parakeetUnified: return "Parakeet Unified 0.6B (609 MB, streaming)"
+        case .moonshineStreamingTiny: return TranscribeCppModel.moonshineStreamingTiny.displayName
+        case .moonshineStreamingSmall: return TranscribeCppModel.moonshineStreamingSmall.displayName
+        case .moonshineStreamingMedium: return TranscribeCppModel.moonshineStreamingMedium.displayName
+        case .nemotronSpeechStreaming: return TranscribeCppModel.nemotronSpeechStreaming.displayName
+        case .nemotron35Streaming: return TranscribeCppModel.nemotron35Streaming.displayName
+        case .voxtralMiniRealtime: return TranscribeCppModel.voxtralMiniRealtime.displayName
+        case .multitalkerParakeetStreaming: return TranscribeCppModel.multitalkerParakeetStreaming.displayName
+        case .whisperBase: return "Whisper Base (148 MB, batch)"
+        case .whisperSmall: return "Whisper Small (163 MB, batch)"
+        case .whisperMedium: return "Whisper Medium (568 MB, batch)"
+        case .whisperLarge: return "Whisper Large (1.1 GB, batch)"
         }
     }
 
@@ -57,16 +147,106 @@ enum TranscriptionBackend: String, CaseIterable {
         displayName.components(separatedBy: " (").first ?? displayName
     }
 
-    var whisperModel: WhisperModel? {
+    /// Relative 0–100 scores from Handy's catalog (`accuracy_score`, `speed_score`):
+    /// accuracy derives from benchmark WER, speed from real-time factor on a
+    /// Ryzen 4750U. They compare models; they are not % correct or Mac timings.
+    /// Parakeet Unified uses Handy's GGUF score for the same base model.
+    /// https://github.com/cjpais/Handy/blob/main/src-tauri/src/catalog/catalog.json
+    var scores: (accuracy: Int, speed: Int)? {
         switch self {
         case .appleStreaming: return nil
+        case .parakeetUnified: return (90, 79)
+        case .moonshineStreamingTiny: return (74, 100)
+        case .moonshineStreamingSmall: return (84, 95)
+        case .moonshineStreamingMedium: return (87, 83)
+        case .nemotronSpeechStreaming: return (86, 80)
+        case .nemotron35Streaming: return (82, 84)
+        case .voxtralMiniRealtime: return (87, 11)
+        case .multitalkerParakeetStreaming: return (86, 96)
+        case .whisperBase: return (71, 99)
+        case .whisperSmall: return (80, 78)
+        case .whisperMedium: return (84, 42)
+        case .whisperLarge: return (84, 23) // large-v2
+        }
+    }
+
+    var whisperModel: WhisperModel? {
+        switch self {
+        case .appleStreaming, .parakeetUnified, .moonshineStreamingTiny,
+             .moonshineStreamingSmall, .moonshineStreamingMedium,
+             .nemotronSpeechStreaming, .nemotron35Streaming,
+             .voxtralMiniRealtime, .multitalkerParakeetStreaming: return nil
         case .whisperBase: return .base
         case .whisperSmall: return .small
         case .whisperMedium: return .medium
+        case .whisperLarge: return .large
         }
     }
 
     var requiresWhisperModel: Bool { whisperModel != nil }
+
+    var isStreamingBackend: Bool {
+        switch self {
+        case .appleStreaming, .parakeetUnified, .moonshineStreamingTiny,
+             .moonshineStreamingSmall, .moonshineStreamingMedium,
+             .nemotronSpeechStreaming, .nemotron35Streaming,
+             .voxtralMiniRealtime, .multitalkerParakeetStreaming: return true
+        case .whisperBase, .whisperSmall, .whisperMedium, .whisperLarge: return false
+        }
+    }
+
+    var isEnglishOnly: Bool {
+        self == .parakeetUnified || self == .moonshineStreamingTiny
+            || self == .moonshineStreamingSmall || self == .moonshineStreamingMedium
+            || self == .nemotronSpeechStreaming || self == .multitalkerParakeetStreaming
+    }
+
+    var transcribeCppModel: TranscribeCppModel? {
+        switch self {
+        case .moonshineStreamingTiny: return .moonshineStreamingTiny
+        case .moonshineStreamingSmall: return .moonshineStreamingSmall
+        case .moonshineStreamingMedium: return .moonshineStreamingMedium
+        case .nemotronSpeechStreaming: return .nemotronSpeechStreaming
+        case .nemotron35Streaming: return .nemotron35Streaming
+        case .voxtralMiniRealtime: return .voxtralMiniRealtime
+        case .multitalkerParakeetStreaming: return .multitalkerParakeetStreaming
+        default: return nil
+        }
+    }
+
+    var transcribeCppStreamFamily: TranscribeCppStreamFamily? {
+        switch self {
+        case .moonshineStreamingTiny, .moonshineStreamingSmall, .moonshineStreamingMedium:
+            return .moonshineStreaming
+        case .nemotronSpeechStreaming:
+            return .nemotronSpeechStreaming
+        case .nemotron35Streaming:
+            return .nemotron35Streaming
+        case .voxtralMiniRealtime:
+            return .voxtralRealtime
+        case .multitalkerParakeetStreaming:
+            return .multitalkerParakeetStreaming
+        default:
+            return nil
+        }
+    }
+
+    /// BCP-47 locales advertised by Nemotron 3.5 ASR Streaming.
+    /// A nil value means the backend uses the full Whisper language picker.
+    var supportedLanguageOptions: [WhisperLanguage]? {
+        guard self == .nemotron35Streaming else { return nil }
+        return [
+            .auto, .english, .chinese, .german, .spanish, .russian, .korean,
+            .french, .japanese, .portuguese, .turkish, .polish, .dutch,
+            .arabic, .swedish, .italian, .hindi, .ukrainian, .czech,
+            .romanian, .danish, .hungarian, .thai, .vietnamese, .slovak,
+            .bulgarian, .lithuanian, .latvian, .estonian, .norwegian,
+        ]
+    }
+
+    var requiresModel: Bool {
+        whisperModel != nil || transcribeCppModel != nil || self == .parakeetUnified
+    }
 }
 
 @MainActor
@@ -88,7 +268,7 @@ final class ModelManager {
         static let didMigrateToMultilingual = "didMigrateToMultilingual"
     }
 
-    private static let legacyEnglishModelFileNames = [
+    private nonisolated static let legacyEnglishModelFileNames = [
         "ggml-base.en.bin",
         "ggml-small.en-q5_1.bin",
         "ggml-medium.en-q5_0.bin",
@@ -103,6 +283,7 @@ final class ModelManager {
     private var downloadGeneration: Int = 0
     private let mode: Mode
     private let defaults: UserDefaults
+    private var fluidAudioPreparation: (() async throws -> Void)?
 
     var selectedModel: WhisperModel {
         didSet {
@@ -113,6 +294,16 @@ final class ModelManager {
     var selectedBackend: TranscriptionBackend {
         didSet {
             defaults.set(selectedBackend.rawValue, forKey: DefaultsKey.selectedBackend)
+            // Apple Speech and the bundled streaming models currently expose
+            // only English in the settings picker. Nemotron 3.5 exposes a
+            // smaller, explicit BCP-47 locale list. Reset a persisted Whisper
+            // language when the selected backend cannot accept that language.
+            if selectedBackend == .appleStreaming || selectedBackend.isEnglishOnly {
+                selectedLanguage = .english
+            } else if let supported = selectedBackend.supportedLanguageOptions,
+                      !supported.contains(selectedLanguage) {
+                selectedLanguage = .english
+            }
         }
     }
 
@@ -123,7 +314,26 @@ final class ModelManager {
     }
 
     var isModelReady: Bool {
-        if selectedBackend == .appleStreaming { return true }
+        if selectedBackend == .appleStreaming {
+            switch mode {
+            case .live:
+                return Self.appleStreamingIsAvailable
+            case .ready, .fixedPath, .missing:
+                return true
+            case .downloading, .failed:
+                return false
+            }
+        }
+        if selectedBackend == .parakeetUnified {
+            switch mode {
+            case .live:
+                return FluidAudioModelSupport.modelsAreAvailable
+            case .ready, .fixedPath:
+                return true
+            case .downloading, .missing, .failed:
+                return false
+            }
+        }
         switch mode {
         case .ready:
             return true
@@ -136,8 +346,39 @@ final class ModelManager {
         }
     }
 
+    /// Whether `backend` can run without a download. Used by the model picker.
+    func isAvailableLocally(_ backend: TranscriptionBackend) -> Bool {
+        if backend == .appleStreaming {
+            switch mode {
+            case .live:
+                return Self.appleStreamingIsAvailable
+            case .ready, .fixedPath, .missing:
+                return backend == selectedBackend && isModelReady
+            case .downloading, .failed:
+                return false
+            }
+        }
+        if backend == .parakeetUnified {
+            switch mode {
+            case .live:
+                return FluidAudioModelSupport.modelsAreAvailable
+            case .ready, .fixedPath:
+                return backend == selectedBackend && isModelReady
+            case .downloading, .missing, .failed:
+                return false
+            }
+        }
+        guard backend.requiresModel else { return true }
+        guard case .live = mode else { return backend == selectedBackend && isModelReady }
+        guard let dir = modelsDirectory else { return false }
+        let fileName = backend.whisperModel?.fileName ?? backend.transcribeCppModel?.fileName
+        guard let fileName else { return false }
+        return FileManager.default.fileExists(atPath: dir.appendingPathComponent(fileName).path)
+    }
+
     var modelFileURL: URL? {
-        guard let whisperModel = selectedBackend.whisperModel else { return nil }
+        guard let fileName = selectedBackend.whisperModel?.fileName
+            ?? selectedBackend.transcribeCppModel?.fileName else { return nil }
         switch mode {
         case .fixedPath(let url):
             return FileManager.default.fileExists(atPath: url.path) ? url : nil
@@ -148,7 +389,7 @@ final class ModelManager {
             return nil
         case .live:
             guard let dir = modelsDirectory else { return nil }
-            let path = dir.appendingPathComponent(whisperModel.fileName)
+            let path = dir.appendingPathComponent(fileName)
             if FileManager.default.fileExists(atPath: path.path) {
                 return path
             }
@@ -181,10 +422,32 @@ final class ModelManager {
         }()
 
         self.selectedModel = WhisperModel(rawValue: storedModel) ?? .small
-        self.selectedBackend = TranscriptionBackend(rawValue: storedBackend)
-            ?? (WhisperModel(rawValue: storedModel).map { Self.backend(for: $0) }
-                ?? initialBackend)
-        self.selectedLanguage = WhisperLanguage(rawValue: storedLanguage) ?? .english
+        let persistedBackend = TranscriptionBackend(rawValue: storedBackend)
+        let initialSelectedBackend: TranscriptionBackend = {
+            guard let persistedBackend else {
+                return WhisperModel(rawValue: storedModel).map { Self.backend(for: $0) }
+                    ?? initialBackend
+            }
+            // A previous Apple selection must not leave the app stuck on a
+            // backend that this Mac cannot provide after an OS or hardware
+            // change. Keep explicit selections for all other backends.
+            if persistedBackend == .appleStreaming,
+               case .live = mode,
+               !Self.appleStreamingIsAvailable {
+                return .whisperSmall
+            }
+            return persistedBackend
+        }()
+        self.selectedBackend = initialSelectedBackend
+        let storedLanguageValue = WhisperLanguage(rawValue: storedLanguage) ?? .english
+        if initialSelectedBackend == .appleStreaming || initialSelectedBackend.isEnglishOnly {
+            self.selectedLanguage = .english
+        } else if let supported = initialSelectedBackend.supportedLanguageOptions,
+                  !supported.contains(storedLanguageValue) {
+            self.selectedLanguage = .english
+        } else {
+            self.selectedLanguage = storedLanguageValue
+        }
 
         // Apply test mode initial state
         switch mode {
@@ -203,6 +466,11 @@ final class ModelManager {
         }
     }
 
+    private static var appleStreamingIsAvailable: Bool {
+        guard #available(macOS 26.0, *) else { return false }
+        return SpeechTranscriber.isAvailable
+    }
+
     func ensureModelAvailable() {
         guard case .live = mode else { return }
         if !isModelReady {
@@ -215,7 +483,17 @@ final class ModelManager {
     }
 
     func selectBackend(_ backend: TranscriptionBackend) {
+        // Fixture mode exercises the real picker and persistence without
+        // downloading model assets or initializing a live recognizer.
+        if case .ready = mode {
+            selectedBackend = backend
+            if let whisperModel = backend.whisperModel {
+                selectedModel = whisperModel
+            }
+            return
+        }
         guard case .live = mode else { return }
+        guard backend != .appleStreaming || Self.appleStreamingIsAvailable else { return }
         downloadTask?.cancel()
         downloadTask = nil
         downloadGeneration &+= 1
@@ -223,7 +501,7 @@ final class ModelManager {
         if let whisperModel = backend.whisperModel {
             selectedModel = whisperModel
         }
-        if backend.requiresWhisperModel && !isModelReady {
+        if backend.requiresModel && !isModelReady {
             downloadTask = Task {
                 await downloadModel()
             }
@@ -235,7 +513,7 @@ final class ModelManager {
 
     func startDownload() {
         guard case .live = mode else { return }
-        guard selectedBackend.requiresWhisperModel else { return }
+        guard selectedBackend.requiresModel else { return }
         downloadTask?.cancel()
         downloadTask = nil
         downloadGeneration &+= 1
@@ -245,6 +523,10 @@ final class ModelManager {
     }
 
     func downloadModel() async {
+        if selectedBackend == .parakeetUnified {
+            await downloadFluidAudioModel()
+            return
+        }
         guard let modelsDir = modelsDirectory else {
             errorMessage = "Cannot determine models directory"
             return
@@ -257,8 +539,12 @@ final class ModelManager {
             return
         }
 
-        guard let whisperModel = selectedBackend.whisperModel else { return }
-        let destinationURL = modelsDir.appendingPathComponent(whisperModel.fileName)
+        let fileName = selectedBackend.whisperModel?.fileName
+            ?? selectedBackend.transcribeCppModel?.fileName
+        let downloadURL = selectedBackend.whisperModel?.downloadURL
+            ?? selectedBackend.transcribeCppModel?.downloadURL
+        guard let fileName, let downloadURL else { return }
+        let destinationURL = modelsDir.appendingPathComponent(fileName)
 
         isDownloading = true
         downloadProgress = 0
@@ -283,7 +569,7 @@ final class ModelManager {
             defer { session.invalidateAndCancel() }
 
             let (tempURL, response) = try await withTaskCancellationHandler {
-                try await delegate.download(session: session, from: whisperModel.downloadURL)
+                try await delegate.download(session: session, from: downloadURL)
             } onCancel: {
                 session.invalidateAndCancel()
             }
@@ -312,15 +598,56 @@ final class ModelManager {
         }
     }
 
+    /// Supplies the concrete FluidAudio service so model preparation and the
+    /// first recording share one loaded Core ML manager.
+    func configureFluidAudioPreparation(
+        _ preparation: @escaping () async throws -> Void
+    ) {
+        fluidAudioPreparation = preparation
+    }
+
+    func updateFluidAudioProgress(_ progress: Double) {
+        guard selectedBackend == .parakeetUnified else { return }
+        downloadProgress = min(max(progress, 0), 1)
+    }
+
+    private func downloadFluidAudioModel() async {
+        guard case .live = mode else { return }
+        guard let preparation = fluidAudioPreparation else {
+            isDownloading = false
+            errorMessage = "Parakeet Unified is unavailable in this build"
+            return
+        }
+
+        isDownloading = true
+        downloadProgress = 0
+        errorMessage = nil
+        let generation = downloadGeneration
+
+        do {
+            try await preparation()
+            guard downloadGeneration == generation else { return }
+            isDownloading = false
+            downloadProgress = 1
+        } catch is CancellationError {
+            // A replacement backend selection owns the next download.
+        } catch {
+            guard downloadGeneration == generation else { return }
+            isDownloading = false
+            errorMessage = "Download failed: \(error.localizedDescription)"
+        }
+    }
+
     private static func backend(for model: WhisperModel) -> TranscriptionBackend {
         switch model {
         case .base: return .whisperBase
         case .small: return .whisperSmall
         case .medium: return .whisperMedium
+        case .large: return .whisperLarge
         }
     }
 
-    private static let logger = Logger(subsystem: "com.openwhisper.OpenWhisper", category: "ModelManager")
+    private nonisolated static let logger = Logger(subsystem: "com.openwhisper.OpenWhisper", category: "ModelManager")
 
     private nonisolated static func migrateToMultilingualModelsIfNeeded(using defaults: UserDefaults, modelsDirectory: URL?) {
         guard !defaults.bool(forKey: DefaultsKey.didMigrateToMultilingual) else { return }

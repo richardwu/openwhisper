@@ -2,6 +2,11 @@
 
 Investigated on October 2, 2026. Requirement: audio and transcription remain on the Mac.
 
+Current implementation status: the app uses a bundled local vocabulary, optional
+manually pinned terms, and a deterministic correction pass after final output.
+The post-paste edit observer and its eight-second Accessibility polling loop have
+been removed. The app does not monitor keystrokes or learn from later edits.
+
 ## Recommendation
 
 Change the app from **record → stop → decode everything → paste** to **record and decode concurrently → stop → finalize the remaining audio → paste once**.
@@ -10,7 +15,12 @@ Compare Apple `SpeechAnalyzer` / `SpeechTranscriber`, WhisperKit with a larger m
 
 Do not choose a model from one short recording. The short fixture establishes feasibility, not general dictation quality. A long, human-corrected recording is the next quality input. The user should not need to maintain a word list: discover spellings from approved projects, current context and normal corrections. Apple is the measured latency candidate; WhisperKit and FluidAudio need direct comparison with automatically selected vocabulary.
 
-The initial production implementation now uses Apple `SpeechTranscriber` on macOS 26 when its local assets are available. The existing Whisper backend remains the fallback on older macOS versions and when Apple Speech is unavailable. The standalone replay experiment remains the benchmark for capture timing and finalization latency.
+The production selector now includes Apple `SpeechTranscriber`, FluidAudio
+Parakeet Unified, transcribe.cpp Moonshine, Nemotron, Voxtral and Multitalker
+streaming families, plus the existing Whisper checkpoints. Apple is the default
+when its on-device recognizer is available; Whisper Small remains the fallback
+on older macOS versions. The standalone replay experiment remains the benchmark
+for capture timing and finalization latency.
 
 The production adapter receives converted microphone frames during recording, reports volatile partial text to the app, and finalizes the same local stream after stop. It does not send audio to a provider. The current Apple path uses Apple's vocabulary and locale assets; the bundled vocabulary prompt remains active in the Whisper fallback.
 
@@ -89,7 +99,7 @@ Reports are stored under `.context/apple-streaming-*.json` with event timestamps
 
 ## Automatic vocabulary without a cloud service
 
-The user does not have a prepared list. Make automatic discovery the normal path. Keep manual pins and exclusions as optional overrides, rather than onboarding requirements. Context selection and correction learning can run on the Mac; neither requires retraining the acoustic model.
+The user does not have a prepared list. Make the bundled vocabulary the normal path. Keep manual pins and exclusions as optional overrides, rather than onboarding requirements. The current correction pass runs locally after final decoding and does not require retraining the acoustic model.
 
 For the first usable implementation, keep discovery simple: ship a local bundle of coding and knowledge-work terms, then promote only high-confidence user corrections. Do not require project selection and do not read text near the cursor. Those sources add permission and privacy cost before the bundle and correction path have been measured on the user's recordings.
 
@@ -117,9 +127,9 @@ The repository includes a script experiment that reads this workspace's `project
 
 **Text near the cursor (deferred).** “Near the cursor” means the focused text element in the frontmost application, not a visual scan of the display. macOS can expose the focused Accessibility element, its selected text/range and, when supported, a bounded substring around that range. The first implementation does not read this context. If later experiments justify it, use `kAXFocusedUIElementAttribute`, selected-text attributes and `kAXStringForRangeParameterizedAttribute`; an app can receive `attributeUnsupported`, `noValue` or `cannotComplete` instead. See Apple's [focused element](https://developer.apple.com/documentation/applicationservices/carbon_accessibility/attributes/kaxfocuseduielementattribute), [attribute access errors](https://developer.apple.com/documentation/applicationservices/1462085-axuielementcopyattributevalue) and [range text API](https://developer.apple.com/documentation/applicationservices/carbon_accessibility/parameterized_attributes?language=objc).
 
-The first implementation needs no special cursor control. It uses the bundled vocabulary and correction learner. A future Accessibility context feature would use the normal keyboard focus and caret, not a visual scan; custom editors, terminals, web views and secure fields may expose less or nothing. Secure text fields must remain excluded by their Accessibility subrole; see Apple's [secure-field definition](https://developer.apple.com/documentation/applicationservices/kaxsecuretextfieldsubrole). It should not use screenshots or OCR.
+The current implementation needs no special cursor control. It uses the bundled vocabulary, optional manually pinned terms, and the final correction pass. A future Accessibility context feature would use the normal keyboard focus and caret, not a visual scan; custom editors, terminals, web views and secure fields may expose less or nothing. Secure text fields must remain excluded by their Accessibility subrole; see Apple's [secure-field definition](https://developer.apple.com/documentation/applicationservices/kaxsecuretextfieldsubrole). It should not use screenshots or OCR.
 
-**Corrections.** The learner should observe only the span that OpenWhisper inserted, in the same focused element, for a short period after paste. The proposed sequence is:
+**Corrections (deferred).** The removed prototype observed only the span that OpenWhisper inserted, in the same focused element, for a short period after paste. It is not part of the current app. If this feature returns, the proposed sequence is:
 
 1. Before paste, record the target application, Accessibility element identity, insertion range when available and a short-lived session identifier.
 2. Paste the final transcript using the existing paste path. Do not capture keyboard events.
@@ -147,7 +157,7 @@ Start experiments with 12–20 terms. The backend adapter must enforce its actua
 
 Do **not** learn canonical spellings from uncorrected ASR history. Those outputs contain the very mistakes we want to fix. A transcript correction or trusted project file provides independent spelling evidence. Case and joined-word edits can provide strong canonical-spelling evidence without proving a reusable phonetic alias. Reject ordinary rewrites, changed numbers/facts and edits outside the inserted span. Do not turn a learned name into a global replacement rule.
 
-The first correction observer can use conservative local rules. Queue uncertain edits instead of accepting them. If rules miss useful phonetic corrections, evaluate a small local language model on the changed span later. Run review outside the transcription path; a local LLM is not a prerequisite for the initial feature.
+If edit-based learning returns later, it should use conservative local rules. Queue uncertain edits instead of accepting them. The current app does not observe edits or run a local language model on changed text.
 
 macOS Accessibility offers selected text/ranges and bounded string-for-range queries, although support varies by app. Apple's `NLTagger` can suggest people, places and organizations, but it is not a technical-term dictionary. A synthetic probe on this Mac found only `Nemotron` among nine coding terms and labeled it a person. CamelCase/acronym rules found the other eight but missed lowercase `pgvector` in another sample. Therefore combine structured metadata and spelling patterns; do not rely on named-entity extraction alone. Probe: `.context/nltagger-term-probe.swift` and `.context/nltagger-term-probe.json`.
 
@@ -189,7 +199,7 @@ A Python standard-library prototype read `project.yml` and 24 Swift files under 
 
 I supplied the entire generated prompt to the actual current Whisper service. The same 9.492-second human recording changed from 4/13 word errors without hints to 0/13 with discovered hints. Silence and background noise stayed empty in both conditions. All five decoder/benchmark tests passed without skips. Input snapshot: `.context/automatic-vocabulary-input.json`. Decoder report: `.context/vocabulary-benchmark-20261003T032054Z-87817.json`.
 
-This demonstrates automatic project discovery → prompt → real local decoder on one example. It does not validate all 16 names, current-window capture, correction learning or production AppState integration. The parser is intentionally limited to this project's scalar metadata and Swift identifier heuristics; regex literals and interpolation expressions are not parsed. Repeated type names are weaker candidates than project/dependency names. Regeneration picks up changed names and removes deleted file evidence without a persistent cache.
+This demonstrates automatic project discovery → prompt → real local decoder on one example. It does not validate all 16 names, current-window capture, edit-based learning or production AppState integration. The parser is intentionally limited to this project's scalar metadata and Swift identifier heuristics; regex literals and interpolation expressions are not parsed. Repeated type names are weaker candidates than project/dependency names. Regeneration picks up changed names and removes deleted file evidence without a persistent cache.
 
 The promoted extractor is `scripts/experiments/discover_vocabulary.py`. Its nine deterministic tests cover explicit source boundaries, symlinks/hidden files, canonical spelling, deduplication, ranking/caps, changed/deleted files, oversized input, nested comments and raw strings. These tests validate extraction behavior, not speech accuracy.
 
@@ -199,9 +209,9 @@ The external-input mode also passed all five benchmark tests without skips. A co
 
 ### 0. Add automatic vocabulary to the existing decoder first
 
-Add a small injected `VocabularyStore` with a bundled technical pool and learned corrections. Provide source controls and an inspectable learned-term list in settings; do not require the user to write the list. Select a bounded snapshot per recording and pass the formatted initial prompt from AppState to the existing service. Serialize decoding and retain prompt memory until completion. Defer project folders and focused-text context until a golden recording shows that the bundled terms and corrections need more evidence.
+Add a small injected `VocabularyStore` with a bundled technical pool and optional manually pinned terms. Provide source controls and an inspectable term list in settings; do not require the user to write the list. Select a bounded snapshot per recording and pass the formatted initial prompt from AppState to the existing service. Apply the local correction pass to final text. Defer project folders, focused-text context and edit-based learning until a golden recording shows that the bundled terms and corrections need more evidence.
 
-Add bounded focused-text context next, with a strict time budget and a cached fallback. Then add an observer for corrections to the app's own inserted span. Validate learning rules independently from recognition and keep uncertain edits out of automatic hints. This order yields an independently useful vocabulary improvement before the streaming migration.
+Add bounded focused-text context next, with a strict time budget and a cached fallback. Only add edit-based learning after separate privacy and false-positive tests. This order yields an independently useful vocabulary improvement before the streaming migration.
 
 ### 1. Freeze the evaluation and compare local backends
 

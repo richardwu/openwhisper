@@ -47,6 +47,29 @@ final class TranscriptionFilterTests: XCTestCase {
         XCTAssertEqual(result, "This is a real transcription.")
     }
 
+    func testAppliesLocalVocabularyCorrectionAfterFiltering() {
+        let result = service.filterTranscription("I trade on Nyzi, then use nasdaq.")
+        XCTAssertEqual(result, "I trade on NYSE, then use NASDAQ.")
+    }
+
+    func testTranscribeFixtureUsesTheSameFinalCorrectionPath() async throws {
+        let suiteName = "com.openwhisper.transcription-filter.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = VocabularyStore(defaults: defaults)
+        let fixtureService = TranscriptionService(
+            mode: .stub(result: "I trade on Nyzi."),
+            vocabularyStore: store
+        )
+        let result = try await fixtureService.transcribe(
+            audioFrames: [0],
+            modelURL: URL(fileURLWithPath: "/tmp/test-model.bin")
+        )
+
+        XCTAssertEqual(result, "I trade on NYSE.")
+    }
+
     func testPunctuationOnlyReturnEmpty() {
         XCTAssertEqual(service.filterTranscription("."), "")
         XCTAssertEqual(service.filterTranscription("..."), "")

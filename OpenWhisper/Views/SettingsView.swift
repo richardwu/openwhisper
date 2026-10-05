@@ -3,7 +3,7 @@ import SwiftUI
 import KeyboardShortcuts
 
 struct SettingsView: View {
-    let appState: AppState
+    @Bindable var appState: AppState
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -24,8 +24,14 @@ struct SettingsView: View {
             }
 
             Section("Hotkeys") {
+                Picker("Recording Mode", selection: $appState.recordingTriggerMode) {
+                    ForEach(RecordingTriggerMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .accessibilityIdentifier("settings.recordingMode")
                 HStack {
-                    Text("Toggle Recording:")
+                    Text("Recording Shortcut:")
                     Spacer()
                     ShortcutRecorder(name: .toggleRecording)
                 }

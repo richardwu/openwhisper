@@ -19,7 +19,16 @@ final class AppleStreamingTranscriptionTests: XCTestCase {
         }
 
         let samples = try readSamples(url: url)
-        let service = AppleStreamingTranscriptionService()
+        let suiteName = "com.openwhisper.test.apple-streaming.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let vocabulary = VocabularyStore(defaults: defaults)
+        let decoder = AppleStreamingTranscriptionService(vocabularyStore: vocabulary)
+        let service = BackendStreamingTranscriptionService(
+            selectedBackend: { .appleStreaming },
+            services: [.appleStreaming: decoder], vocabularyStore: vocabulary
+        )
+        defer { service.cancel() }
         var partials: [String] = []
         service.onPartialText = { text in
             if !text.isEmpty { partials.append(text) }
@@ -34,6 +43,7 @@ final class AppleStreamingTranscriptionTests: XCTestCase {
         XCTAssertFalse(partials.isEmpty, "Streaming should report text before finalization")
         XCTAssertTrue(text.contains("this is me testing"), "Unexpected final text: \(text)")
         XCTAssertTrue(text.contains("work properly"), "Unexpected final text: \(text)")
+        XCTAssertEqual(partials.count, Set(partials).count, "The shared router must skip duplicate previews")
     }
 
     private func readSamples(url: URL) throws -> [Float] {
@@ -44,9 +54,14 @@ final class AppleStreamingTranscriptionTests: XCTestCase {
         let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity)!
         var conversionError: NSError?
         let status = AVAudioConverter(from: file.processingFormat, to: format)!.convert(to: output, error: &conversionError) { _, status in
-            let input = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 4096)!
+            guard file.framePosition < file.length else {
+                status.pointee = .endOfStream
+                return nil
+            }
+            let frameCount = AVAudioFrameCount(min(4_096, file.length - file.framePosition))
+            let input = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frameCount)!
             do {
-                try file.read(into: input)
+                try file.read(into: input, frameCount: frameCount)
                 if input.frameLength == 0 {
                     status.pointee = .endOfStream
                     return nil

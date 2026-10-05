@@ -2,6 +2,29 @@ import Sparkle
 import SwiftUI
 
 @main
+enum OpenWhisperEntryPoint {
+    @MainActor
+    static func main() {
+        if LaunchConfiguration.current.isHeadlessTest {
+            HeadlessTestApp.main()
+        } else {
+            OpenWhisperApp.main()
+        }
+    }
+}
+
+/// SceneBuilder cannot conditionally omit window scenes at runtime. Select a
+/// Settings-only app before launch so background tests never create a window.
+private struct HeadlessTestApp: App {
+    init() {
+        NSApplication.shared.setActivationPolicy(.prohibited)
+    }
+
+    var body: some Scene {
+        Settings { EmptyView() }
+    }
+}
+
 struct OpenWhisperApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
@@ -36,7 +59,9 @@ struct OpenWhisperApp: App {
         Window(AppIdentity.displayName, id: AppIdentity.mainWindowID) {
             MainWindowView(appState: appState)
         }
-        .defaultSize(width: 620, height: 525)
+        .defaultSize(width: 620, height: 640)
+        // Window min/max size follows MainWindowView's frame, capping width at 700.
+        .windowResizability(.contentSize)
         .commands {
             CommandGroup(after: .appInfo) {
                 if let updater = updaterController?.updater {

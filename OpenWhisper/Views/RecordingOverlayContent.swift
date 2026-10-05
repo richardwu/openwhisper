@@ -105,10 +105,12 @@ struct RecordingOverlayContent: View {
             ProgressView()
                 .controlSize(.small)
                 .tint(.white)
+                .accessibilityIdentifier("overlay.processing.spinner")
 
-            Text("Transcribing...")
+            Text("Processing...")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.white)
+                .accessibilityIdentifier("overlay.processing.label")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)

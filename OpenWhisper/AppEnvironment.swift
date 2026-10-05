@@ -41,26 +41,40 @@ struct AppEnvironment {
 
         let vocabularyStore = VocabularyStore(defaults: defaults)
         let transcriptionService = TranscriptionService(mode: .live, vocabularyStore: vocabularyStore)
-        let correctionLearningService = CorrectionLearningService(
-            recordCorrection: { [weak transcriptionService] original, corrected in
-                transcriptionService?.recordCorrection(from: original, to: corrected) ?? false
-            },
-            learnedTerms: { [weak transcriptionService] in
-                transcriptionService?.vocabularyStore?.learnedTerms ?? []
-            }
-        )
-        let streamingTranscriptionService: (any StreamingTranscriptionService)?
-        if #available(macOS 26.0, *) {
-            streamingTranscriptionService = AppleStreamingTranscriptionService(vocabularyStore: vocabularyStore)
-        } else {
-            streamingTranscriptionService = nil
+        let parakeetService = FluidAudioStreamingTranscriptionService()
+        parakeetService.onPreparationProgress = { [weak modelManager] progress in
+            modelManager?.updateFluidAudioProgress(progress)
         }
+        modelManager.configureFluidAudioPreparation {
+            try await parakeetService.prepare()
+        }
+
+        var streamingServices: [TranscriptionBackend: any StreamingTranscriptionService] = [
+            .parakeetUnified: parakeetService,
+        ]
+        for backend in TranscriptionBackend.allCases {
+            guard let family = backend.transcribeCppStreamFamily else { continue }
+            streamingServices[backend] = TranscribeCppStreamingTranscriptionService(
+                modelURLProvider: { @MainActor in modelManager.modelFileURL },
+                vocabularyStore: vocabularyStore,
+                family: family
+            )
+        }
+        if #available(macOS 26.0, *) {
+            streamingServices[.appleStreaming] = AppleStreamingTranscriptionService(vocabularyStore: vocabularyStore)
+        }
+        let streamingTranscriptionService: (any StreamingTranscriptionService)? =
+            BackendStreamingTranscriptionService(
+                selectedBackend: { modelManager.selectedBackend },
+                services: streamingServices,
+                vocabularyStore: vocabularyStore
+            )
 
         return AppEnvironment(
             audioRecorder: AudioRecorder(mode: .live),
             streamingTranscriptionService: streamingTranscriptionService,
             transcriptionService: transcriptionService,
-            pasteService: PasteService(mode: .live, correctionLearningService: correctionLearningService),
+            pasteService: PasteService(mode: .live),
             modelManager: modelManager,
             permissionsClient: PermissionsClient(mode: .live),
             historyStore: HistoryStore(defaults: defaults),
@@ -79,13 +93,14 @@ struct AppEnvironment {
             modelPath: nil
         )
 
+        let vocabularyStore = VocabularyStore(defaults: defaults)
         let env: AppEnvironment
         switch scenario {
         case .launchReadyState:
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: [])),
                 streamingTranscriptionService: nil,
-                transcriptionService: TranscriptionService(mode: .stub(result: "")),
+                transcriptionService: TranscriptionService(mode: .stub(result: ""), vocabularyStore: vocabularyStore),
                 pasteService: PasteService(mode: .spy),
                 modelManager: ModelManager(mode: .ready, defaults: defaults),
                 permissionsClient: PermissionsClient(mode: .mock(microphone: true, accessibility: true)),
@@ -96,7 +111,7 @@ struct AppEnvironment {
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: Array(repeating: 0.1, count: 16000))),
                 streamingTranscriptionService: nil,
-                transcriptionService: TranscriptionService(mode: .stub(result: "Hello world")),
+                transcriptionService: TranscriptionService(mode: .stub(result: "Hello world"), vocabularyStore: vocabularyStore),
                 pasteService: PasteService(mode: .spy),
                 modelManager: ModelManager(mode: .ready, defaults: defaults),
                 permissionsClient: PermissionsClient(mode: .mock(microphone: true, accessibility: true)),
@@ -107,7 +122,7 @@ struct AppEnvironment {
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: Array(repeating: 0.0, count: 16000))),
                 streamingTranscriptionService: nil,
-                transcriptionService: TranscriptionService(mode: .stub(result: "")),
+                transcriptionService: TranscriptionService(mode: .stub(result: ""), vocabularyStore: vocabularyStore),
                 pasteService: PasteService(mode: .spy),
                 modelManager: ModelManager(mode: .ready, defaults: defaults),
                 permissionsClient: PermissionsClient(mode: .mock(microphone: true, accessibility: true)),
@@ -118,7 +133,7 @@ struct AppEnvironment {
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: [])),
                 streamingTranscriptionService: nil,
-                transcriptionService: TranscriptionService(mode: .stub(result: "")),
+                transcriptionService: TranscriptionService(mode: .stub(result: ""), vocabularyStore: vocabularyStore),
                 pasteService: PasteService(mode: .spy),
                 modelManager: ModelManager(mode: .ready, defaults: defaults),
                 permissionsClient: PermissionsClient(mode: .mock(microphone: false, accessibility: true)),
@@ -129,7 +144,7 @@ struct AppEnvironment {
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: Array(repeating: 0.1, count: 16000))),
                 streamingTranscriptionService: nil,
-                transcriptionService: TranscriptionService(mode: .stub(result: "Hello world")),
+                transcriptionService: TranscriptionService(mode: .stub(result: "Hello world"), vocabularyStore: vocabularyStore),
                 pasteService: PasteService(mode: .spy),
                 modelManager: ModelManager(mode: .ready, defaults: defaults),
                 permissionsClient: PermissionsClient(mode: .mock(microphone: true, accessibility: false)),
@@ -140,7 +155,7 @@ struct AppEnvironment {
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: [])),
                 streamingTranscriptionService: nil,
-                transcriptionService: TranscriptionService(mode: .stub(result: "")),
+                transcriptionService: TranscriptionService(mode: .stub(result: ""), vocabularyStore: vocabularyStore),
                 pasteService: PasteService(mode: .spy),
                 modelManager: ModelManager(mode: .downloading(progress: 0.45), defaults: defaults),
                 permissionsClient: PermissionsClient(mode: .mock(microphone: true, accessibility: true)),
@@ -151,7 +166,7 @@ struct AppEnvironment {
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: Array(repeating: 0.1, count: 16000))),
                 streamingTranscriptionService: nil,
-                transcriptionService: TranscriptionService(mode: .stubError),
+                transcriptionService: TranscriptionService(mode: .stubError, vocabularyStore: vocabularyStore),
                 pasteService: PasteService(mode: .spy),
                 modelManager: ModelManager(mode: .ready, defaults: defaults),
                 permissionsClient: PermissionsClient(mode: .mock(microphone: true, accessibility: true)),
@@ -166,7 +181,7 @@ struct AppEnvironment {
             env = AppEnvironment(
                 audioRecorder: AudioRecorder(mode: .fixture(samples: [])),
                 streamingTranscriptionService: nil,
-                transcriptionService: TranscriptionService(mode: .stub(result: "")),
+                transcriptionService: TranscriptionService(mode: .stub(result: ""), vocabularyStore: vocabularyStore),
                 pasteService: PasteService(mode: .spy),
                 modelManager: ModelManager(mode: .ready, defaults: defaults),
                 permissionsClient: PermissionsClient(mode: .mock(microphone: true, accessibility: true)),

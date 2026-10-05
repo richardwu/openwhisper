@@ -1,0 +1,17 @@
+framework module CTranscribe {
+    header "extensions.h"
+    header "moonshine_streaming.h"
+    header "parakeet.h"
+    header "sortformer.h"
+    header "transcribe.h"
+    header "voxtral_realtime.h"
+    header "whisper.h"
+
+    link "c++"
+    link "z"
+    link framework "Accelerate"
+    link framework "Metal"
+    link framework "Foundation"
+
+    export *
+}

@@ -18,7 +18,7 @@ final class TranscriptionService {
     }
 
     private let mode: Mode
-    /// Shared local store used by transcription and correction learning.
+    /// Shared local store used for model hints and final text correction.
     /// A nil store is useful for controlled baseline benchmarks.
     let vocabularyStore: VocabularyStore?
     private var whisperInstance: Whisper?
@@ -49,19 +49,14 @@ final class TranscriptionService {
             updateInitialPrompt(vocabularyStore?.makePrompt(extra: initialPrompt) ?? initialPrompt, on: whisper.params)
             let segments = try await whisper.transcribe(audioFrames: audioFrames)
             let rawText = segments.map(\.text).joined()
-            return filterTranscription(rawText)
+            return await finalizeTranscription(rawText)
         case .stub(let result):
-            return result
+            // Keep fixture transcription on the same finalization path as a
+            // live decoder, including filtering and local vocabulary repair.
+            return await finalizeTranscription(result)
         case .stubError:
             throw TranscriptionError.stubError
         }
-    }
-
-    /// Records a validated replacement observed after a transcription paste.
-    /// The caller should limit the input to the text span it owns.
-    @discardableResult
-    func recordCorrection(from original: String, to corrected: String) -> Bool {
-        vocabularyStore?.recordCorrection(from: original, to: corrected) ?? false
     }
 
     /// Adds one explicitly reviewed spelling to the local prompt vocabulary.
@@ -70,8 +65,21 @@ final class TranscriptionService {
         vocabularyStore?.learn(term: term) ?? false
     }
 
+    @discardableResult
+    func learnVocabularyTerms(_ input: String) -> [String] {
+        vocabularyStore?.learnTerms(input) ?? []
+    }
+
+    var learnedVocabularyTerms: [String] {
+        vocabularyStore?.learnedTerms ?? []
+    }
+
     func forgetVocabularyTerm(_ term: String) {
         vocabularyStore?.forget(term: term)
+    }
+
+    func forgetAllVocabularyTerms() {
+        vocabularyStore?.removeAllLearnedTerms()
     }
 
     private func updateInitialPrompt(_ prompt: String?, on params: WhisperParams) {
@@ -90,6 +98,19 @@ final class TranscriptionService {
     }
 
     func filterTranscription(_ text: String) -> String {
+        Self.filterTranscription(text, correction: vocabularyStore?.correctionSnapshot())
+    }
+
+    func finalizeTranscription(_ text: String) async -> String {
+        let correction = vocabularyStore?.correctionSnapshot()
+        return await Task.detached(priority: .userInitiated) {
+            Self.filterTranscription(text, correction: correction)
+        }.value
+    }
+
+    nonisolated private static func filterTranscription(
+        _ text: String, correction: (@Sendable (String) -> String)?
+    ) -> String {
         var result = text
         // Remove <|...|> special tokens
         result = result.replacingOccurrences(of: "<\\|[^|]*\\|>", with: "", options: .regularExpression)
@@ -116,7 +137,10 @@ final class TranscriptionService {
         if hallucinatedPhrases.contains(result.lowercased().trimmingCharacters(in: .punctuationCharacters)) {
             return ""
         }
-        return result
+        // Apply the same local correction pass to every backend. Apple
+        // Speech accepts contextual strings as a hint, but it does not
+        // guarantee the requested spelling in its final result.
+        return correction?(result) ?? result
     }
 
     private func getOrCreateWhisper(modelURL: URL, language: WhisperLanguage) throws -> Whisper {
