@@ -53,6 +53,8 @@ struct AppEnvironment {
             .parakeetUnified: parakeetService,
         ]
         let nativeModelCache = TranscribeCppStreamingTranscriptionService.ModelCache()
+        // Release deselected weights. An active decoder keeps its own pinned
+        // model; the cache epoch prevents that session from refilling the cache.
         modelManager.onBackendChange = {
             nativeModelCache.invalidate()
         }

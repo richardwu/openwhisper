@@ -115,7 +115,7 @@ final class TranscriptionService {
         // Remove <|...|> special tokens
         result = result.replacingOccurrences(of: "<\\|[^|]*\\|>", with: "", options: .regularExpression)
         // Strip known non-speech markers while preserving dictated brackets.
-        let marker = "(?:blank[_ ]audio|music|inaudible|no sound|silence|applause|laughter|noise|speaking foreign language)"
+        let marker = "(?:blank[_ ]audio|music|inaudible|no sound|silence|applause|laughter|noise|speaking foreign language|cough(?:s|ing)?|door slam(?:s|ming)?)"
         for (open, close) in [("\\[", "\\]"), ("\\(", "\\)")] {
             result = result.replacingOccurrences(of: "(?i)" + open + "\\s*" + marker + "\\s*" + close,
                                                   with: "", options: .regularExpression)

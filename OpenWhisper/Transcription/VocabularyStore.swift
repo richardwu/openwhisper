@@ -116,9 +116,13 @@ final class VocabularyStore {
         candidateTerms(from: loadLearnedTerms())
     }
 
-    /// Native biasing shares correction rules and the prompt term budget.
+    /// Bias proper names too, but exclude ambiguous bundled words unless learned.
     var nativeTerms: [String] {
-        Array(correctionVocabulary().prefix(maxTerms).map(\.term))
+        let records = loadLearnedTerms()
+        let learnedKeys = Set(records.map { Self.comparisonKey($0.term) })
+        return Array(candidateTerms(from: records).filter {
+            learnedKeys.contains(Self.comparisonKey($0)) || !Self.ambiguousBundledKeys.contains(Self.correctionKey($0))
+        }.prefix(maxTerms))
     }
 
     private func candidateTerms(from records: [LearnedTerm]) -> [String] {

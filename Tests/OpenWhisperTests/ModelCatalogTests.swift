@@ -3,6 +3,20 @@ import SwiftWhisper
 @testable import OpenWhisper
 
 final class ModelCatalogTests: XCTestCase {
+    @MainActor
+    func testCancelledDownloadClearsCurrentProgressState() async {
+        let suiteName = "com.openwhisper.cancelled-download.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(TranscriptionBackend.parakeetUnified.rawValue, forKey: "selectedBackend")
+        defaults.set(true, forKey: "didMigrateToMultilingual")
+        let manager = ModelManager(mode: .live, defaults: defaults)
+        manager.configureFluidAudioPreparation { throw CancellationError() }
+        await manager.downloadModel()
+        XCTAssertFalse(manager.isDownloading)
+        XCTAssertNil(manager.errorMessage)
+    }
+
     func testModelDownloadsArePinnedAndChecksumsRejectCorruptFiles() throws {
         let urls = WhisperModel.allCases.map(\.downloadURL) + TranscribeCppModel.allCases.map(\.downloadURL)
         XCTAssertTrue(urls.allSatisfy { !$0.path.contains("/resolve/main/") })

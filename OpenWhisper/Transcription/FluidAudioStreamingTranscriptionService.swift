@@ -190,6 +190,9 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
             _ = try? await previousStartup?.value
             await previousProcessing?.value
             _ = try? await previousFinish?.value
+            // startupTask remains set throughout a dirty session. Only a
+            // successful finish clears it after reset; repeated cancels await
+            // previousCleanup, so they cannot skip an outstanding reset.
             if previousStartup != nil || previousProcessing != nil || previousFinish != nil {
                 try? await manager.reset()
             }

@@ -4,6 +4,17 @@ import SwiftWhisper
 
 @MainActor
 final class StreamingTranscriptionTests: XCTestCase {
+    func testAppleJoinsSegmentsWithoutMergingWordsOrSeparatingPunctuation() {
+        if #available(macOS 26.0, *) {
+            XCTAssertEqual(AppleStreamingTranscriptionService.joinSegments("hello", "world"), "hello world")
+            XCTAssertEqual(AppleStreamingTranscriptionService.joinSegments("hello ", "world"), "hello world")
+            XCTAssertEqual(AppleStreamingTranscriptionService.joinSegments("hello", ", world"), "hello, world")
+            XCTAssertEqual(AppleStreamingTranscriptionService.joinSegments("", "hello"), "hello")
+            XCTAssertEqual(AppleStreamingTranscriptionService.joinSegments("你好", "世界", language: .chinese), "你好世界")
+            XCTAssertEqual(AppleStreamingTranscriptionService.joinSegments("こんにちは", "世界", language: .japanese), "こんにちは世界")
+        }
+    }
+
     func testRouterReportsUnavailableBackendAtStart() {
         let router = BackendStreamingTranscriptionService(
             selectedBackend: { .appleStreaming }, services: [:]

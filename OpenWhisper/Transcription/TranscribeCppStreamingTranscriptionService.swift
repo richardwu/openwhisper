@@ -249,7 +249,7 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
         completedResult = result
         nativeCancellationToken = nil
         // A resumed caller may begin again before native stream teardown.
-        cleanupWorker = worker
+        cleanupWorker = worker ?? cleanupWorker
         worker = nil
         if let completion {
             self.completion = nil

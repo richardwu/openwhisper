@@ -212,6 +212,8 @@ final class AppState {
         }
 
         do {
+            // Tap delivery hops to the main actor, so this synchronous setup
+            // pins the decoder before any queued audio callback can run.
             try audioRecorder.startRecording(retainSamples: !modelManager.selectedBackend.isStreamingBackend)
             recordingSettings = (modelManager.selectedBackend, modelManager.modelFileURL, modelManager.selectedLanguage)
             isRecording = true

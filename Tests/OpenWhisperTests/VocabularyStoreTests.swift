@@ -33,6 +33,9 @@ final class VocabularyStoreTests: XCTestCase {
         XCTAssertEqual(smallStore.nativeTerms.count, 2)
         XCTAssertFalse(store.nativeTerms.contains("REST"))
         XCTAssertFalse(store.nativeTerms.contains("SAM"))
+        XCTAssertTrue(store.nativeTerms.contains("Claude"))
+        XCTAssertTrue(store.nativeTerms.contains("Swift"))
+        XCTAssertTrue(store.nativeTerms.contains("Docker"))
         XCTAssertTrue(store.learn(term: "REST"))
         XCTAssertEqual(store.nativeTerms.first, "REST")
     }

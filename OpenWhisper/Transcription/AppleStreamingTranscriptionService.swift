@@ -121,7 +121,7 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
             throw NSError(domain: "OpenWhisper.AppleStreaming", code: 1,
                           userInfo: [NSLocalizedDescriptionKey: "Apple on-device transcription is unavailable"])
         }
-        return finalText + volatileText
+        return Self.joinSegments(finalText, volatileText, language: language)
     }
 
     func cancel() {
@@ -262,15 +262,23 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         frameOffset += Int64(buffer.frameLength)
     }
 
+    nonisolated static func joinSegments(_ left: String, _ right: String, language: WhisperLanguage = .english) -> String {
+        guard let last = left.last, let first = right.first else { return left + right }
+        // Chinese and Japanese words do not require spaces between segments.
+        let unspaced = language == .chinese || language == .japanese
+        let separator = unspaced || last.isWhitespace || first.isWhitespace || first.isPunctuation ? "" : " "
+        return left + separator + right
+    }
+
     private func consume(_ result: SpeechTranscriber.Result) {
         let text = String(result.text.characters)
         if result.isFinal {
-            finalText += text
+            finalText = Self.joinSegments(finalText, text, language: language)
             volatileText = ""
         } else {
             volatileText = text
         }
-        let partial = finalText + volatileText
+        let partial = Self.joinSegments(finalText, volatileText, language: language)
         guard !partial.isEmpty, partial != lastPartial else { return }
         lastPartial = partial
         onPartialText?(partial)

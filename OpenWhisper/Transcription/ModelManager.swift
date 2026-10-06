@@ -533,9 +533,7 @@ final class ModelManager {
         }
         guard case .live = mode else { return }
         guard backend != .appleStreaming || Self.appleStreamingIsAvailable else { return }
-        downloadTask?.cancel()
-        downloadTask = nil
-        downloadGeneration &+= 1
+        cancelDownload()
         selectedBackend = backend
         if let whisperModel = backend.whisperModel {
             selectedModel = whisperModel
@@ -553,15 +551,27 @@ final class ModelManager {
     func startDownload() {
         guard case .live = mode else { return }
         guard selectedBackend.requiresModel else { return }
-        downloadTask?.cancel()
-        downloadTask = nil
-        downloadGeneration &+= 1
+        cancelDownload()
         downloadTask = Task {
             await downloadModel()
         }
     }
 
+    private func cancelDownload() {
+        downloadTask?.cancel()
+        downloadTask = nil
+        downloadGeneration &+= 1
+        isDownloading = false
+        downloadProgress = 0
+        errorMessage = nil
+    }
+
     func downloadModel() async {
+        guard !Task.isCancelled else { return }
+        let generation = downloadGeneration
+        defer {
+            if downloadGeneration == generation { isDownloading = false }
+        }
         if selectedBackend == .parakeetUnified {
             await downloadFluidAudioModel()
             return
@@ -590,8 +600,6 @@ final class ModelManager {
         isDownloading = true
         downloadProgress = 0
         errorMessage = nil
-
-        let generation = self.downloadGeneration
 
         do {
             try Task.checkCancellation()
@@ -636,9 +644,9 @@ final class ModelManager {
             isDownloading = false
             downloadProgress = 1.0
         } catch is CancellationError {
-            // Don't reset isDownloading — the replacement download will take over
+            // The generation-guarded defer clears only this download.
         } catch let error as URLError where error.code == .cancelled {
-            // Don't reset isDownloading — the replacement download will take over
+            // The generation-guarded defer clears only this download.
         } catch {
             guard self.downloadGeneration == generation else { return }
             isDownloading = false

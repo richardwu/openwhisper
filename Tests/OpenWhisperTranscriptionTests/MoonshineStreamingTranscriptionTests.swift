@@ -24,7 +24,7 @@ final class MoonshineStreamingTranscriptionTests: XCTestCase {
         let samples = try readSamples(url: fixture)
         let cache = TranscribeCppStreamingTranscriptionService.ModelCache()
         let service = TranscribeCppStreamingTranscriptionService(
-            modelURLProvider: { modelURL }, modelCache: cache
+            modelURLProvider: { nil }, modelCache: cache
         )
         var partials: [String] = []
         service.onPartialText = { text in
@@ -35,6 +35,21 @@ final class MoonshineStreamingTranscriptionTests: XCTestCase {
         for recording in 0..<3 {
             service.configure(language: .english, modelURL: modelURL)
             partials.removeAll()
+            if recording == 2 {
+                service.begin()
+                service.append(audioFrames: Array(samples.prefix(3_200)))
+                try await Task.sleep(for: .milliseconds(10))
+                service.cancel()
+                service.configure(language: .english, modelURL: nil)
+                service.begin()
+                do {
+                    _ = try await service.finish()
+                    XCTFail("Expected the missing-model startup error")
+                } catch {
+                    XCTAssertTrue(error.localizedDescription.contains("not downloaded"))
+                }
+                service.configure(language: .english, modelURL: modelURL)
+            }
             service.begin()
             if recording == 1 { cache.invalidate() }
             for start in stride(from: 0, to: samples.count, by: 3_200) {
