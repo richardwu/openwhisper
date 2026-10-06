@@ -23,6 +23,7 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
     private var pendingFrames: [[Float]] = []
     private var lastPartial = ""
     private var modelsLoaded = false
+    private var releaseWhenIdle = false
     private var isStarting = false
     private var acceptingFrames = false
     private var didFail = false
@@ -36,6 +37,8 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
     /// recording lets the model picker report real readiness and avoids doing
     /// the first Core ML compile after the user starts speaking.
     func prepare() async throws {
+        try Task.checkCancellation()
+        await cleanupTask?.value
         try Task.checkCancellation()
         while !modelsLoaded {
             try Task.checkCancellation()
@@ -73,6 +76,15 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
                 task.cancel()
             }
         }
+    }
+
+    /// Keep an active decoder pinned, then release deselected Core ML weights.
+    func setSelected(_ selected: Bool) {
+        releaseWhenIdle = !selected
+        guard !selected, !acceptingFrames, !isStarting, startupTask == nil,
+              processingTask == nil, finishingTask == nil else { return }
+        preparationTask?.cancel()
+        cancel()
     }
 
     func configure(language: WhisperLanguage) {
@@ -163,6 +175,7 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
             guard currentGeneration == generation else { throw CancellationError() }
             finishingTask = nil
             if wasReset { startupTask = nil }
+            if releaseWhenIdle { cancel() }
             lastPartial = ""
             return text
         } catch {
@@ -173,6 +186,7 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
 
     func cancel() {
         generation &+= 1
+        let previousPreparation = preparationTask
         let previousStartup = startupTask
         let previousProcessing = processingTask
         let previousCleanup = cleanupTask
@@ -200,6 +214,11 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
             // previousCleanup, so they cannot skip an outstanding reset.
             if previousStartup != nil || previousProcessing != nil || previousFinish != nil {
                 try? await manager.reset()
+            }
+            if releaseWhenIdle {
+                _ = try? await previousPreparation?.value
+                await manager.cleanup()
+                modelsLoaded = false
             }
         }
     }

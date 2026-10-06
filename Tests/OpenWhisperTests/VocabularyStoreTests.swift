@@ -114,6 +114,13 @@ final class VocabularyStoreTests: XCTestCase {
         XCTAssertEqual(store.correctTranscription("I write c#"), "I write C#")
     }
 
+    func testSavingExistingTermsDoesNotReorderVocabulary() {
+        store.learnTerms("AcmeDB, AnotherDB")
+        let originalOrder = store.candidateTerms
+        store.learnTerms("AcmeDB, AcmeDB")
+        XCTAssertEqual(store.candidateTerms, originalOrder)
+    }
+
     func testCorrectionSnapshotWorksOnWorkerAfterDictionaryChanges() async {
         XCTAssertTrue(store.learn(term: "AcmeDB"))
         let correction = store.correctionSnapshot()

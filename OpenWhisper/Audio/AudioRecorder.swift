@@ -260,14 +260,12 @@ final class AudioRecorder {
         guard !floatArray.isEmpty else { return }
 
         // Compute RMS for level metering
-        if !floatArray.isEmpty {
-            var sumOfSquares: Float = 0
-            for sample in floatArray {
-                sumOfSquares += sample * sample
-            }
-            let rms = sqrtf(sumOfSquares / Float(floatArray.count))
-            meter.update(rms)
+        var sumOfSquares: Float = 0
+        for sample in floatArray {
+            sumOfSquares += sample * sample
         }
+        let rms = sqrtf(sumOfSquares / Float(floatArray.count))
+        meter.update(rms)
 
         if streamFrames {
             Task { @MainActor [weak self] in

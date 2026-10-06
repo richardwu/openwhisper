@@ -174,12 +174,8 @@ final class VocabularyStore {
 
         var records = loadLearnedTerms()
         let key = Self.comparisonKey(value)
-        if let index = records.firstIndex(where: { Self.comparisonKey($0.term) == key }) {
-            records[index].count += 1
-            records[index].lastLearned = Date()
-        } else {
-            records.append(LearnedTerm(term: value))
-        }
+        guard !records.contains(where: { Self.comparisonKey($0.term) == key }) else { return true }
+        records.append(LearnedTerm(term: value))
         save(records)
         return true
     }

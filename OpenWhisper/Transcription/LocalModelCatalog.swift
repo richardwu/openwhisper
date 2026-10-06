@@ -77,7 +77,8 @@ enum LocalModelCatalog {
             displayName: "Multitalker Parakeet Streaming 0.6B",
             runtime: .transcribeCpp,
             sourceURL: URL(string: "https://huggingface.co/handy-computer/multitalker-parakeet-streaming-0.6b-v1-gguf")!,
-            reasonUnavailable: "Single-speaker transcript support is available; speaker diarization is not exposed by the Swift binding."
+            // Single-speaker transcription is supported; the Swift binding does not expose diarization.
+            reasonUnavailable: ""
         ),
     ]
 

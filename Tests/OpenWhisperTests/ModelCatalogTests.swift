@@ -111,6 +111,23 @@ final class ModelCatalogTests: XCTestCase {
         XCTAssertThrowsError(try ModelManager.verifyModel(at: file, expectedSHA256: String(repeating: "0", count: 64)))
     }
 
+    @MainActor
+    func testCanceledChecksumVerificationStopsBackgroundWorker() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: file) }
+        try Data(repeating: 0, count: 1_048_576).write(to: file)
+        let parent = Task { @MainActor in
+            try await ModelManager.verifyModelInBackground(at: file, expectedSHA256: String(repeating: "0", count: 64))
+        }
+        parent.cancel()
+        do {
+            try await parent.value
+            XCTFail("Canceled verification must not complete")
+        } catch {
+            XCTAssertTrue(error is CancellationError, "Expected cancellation, got \(error)")
+        }
+    }
+
     func testLargeModelUsesAWhisperCppCheckpointSupportedByTheBundledRuntime() {
         XCTAssertEqual(WhisperModel.large.fileName, "ggml-large-v2-q5_0.bin")
         XCTAssertEqual(WhisperModel.large.downloadURL.host, "huggingface.co")
@@ -172,6 +189,7 @@ final class ModelCatalogTests: XCTestCase {
     }
 
     func testPendingHandyModelsAreCatalogedButNotSelectable() {
+        XCTAssertTrue(LocalModelCatalog.supportedHandyModels.allSatisfy { $0.reasonUnavailable.isEmpty })
         let pendingModels = LocalModelCatalog.pendingHandyModels
         let selectableNames = Set(TranscriptionBackend.allCases.map(\.displayName))
         let pendingIDs = Set(pendingModels.map(\.identifier))

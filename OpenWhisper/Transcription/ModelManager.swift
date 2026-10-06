@@ -641,7 +641,7 @@ final class ModelManager {
 
             let config = URLSessionConfiguration.default
             config.timeoutIntervalForRequest = 300    // 5 min per chunk
-            config.timeoutIntervalForResource = 3600  // 1 hour total
+            config.timeoutIntervalForResource = 24 * 3600  // Large checkpoints can take hours on slow connections.
             let delegate = DownloadDelegate { [weak self] progress in
                 Task { @MainActor in
                     guard let self, self.downloadGeneration == generation else { return }
@@ -665,9 +665,7 @@ final class ModelManager {
                 throw URLError(.badServerResponse)
             }
 
-            try await Task.detached(priority: .utility) {
-                try Self.verifyModel(at: tempURL, expectedSHA256: expectedSHA256)
-            }.value
+            try await Self.verifyModelInBackground(at: tempURL, expectedSHA256: expectedSHA256)
             try Task.checkCancellation()
             guard self.downloadGeneration == generation else { return }
 
@@ -687,6 +685,17 @@ final class ModelManager {
             guard self.downloadGeneration == generation else { return }
             isDownloading = false
             errorMessage = "Download failed: \(error.localizedDescription)"
+        }
+    }
+
+    nonisolated static func verifyModelInBackground(at url: URL, expectedSHA256: String) async throws {
+        let verification = Task.detached(priority: .utility) {
+            try verifyModel(at: url, expectedSHA256: expectedSHA256)
+        }
+        try await withTaskCancellationHandler {
+            try await verification.value
+        } onCancel: {
+            verification.cancel()
         }
     }
 
@@ -813,22 +822,22 @@ final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
                     didFinishDownloadingTo location: URL) {
-        // Copy to a stable temp location — the file at `location` is deleted when this method returns
+        guard let continuation else { return }
+        self.continuation = nil
+        // Move to a stable temp location before URLSession removes its temporary file.
         let tempFile = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".bin")
         do {
-            try FileManager.default.copyItem(at: location, to: tempFile)
+            try FileManager.default.moveItem(at: location, to: tempFile)
             guard let response = downloadTask.response else {
                 try? FileManager.default.removeItem(at: tempFile)
-                continuation?.resume(throwing: URLError(.badServerResponse))
-                continuation = nil
+                continuation.resume(throwing: URLError(.badServerResponse))
                 return
             }
-            continuation?.resume(returning: (tempFile, response))
+            continuation.resume(returning: (tempFile, response))
         } catch {
             try? FileManager.default.removeItem(at: tempFile)
-            continuation?.resume(throwing: error)
+            continuation.resume(throwing: error)
         }
-        continuation = nil
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {

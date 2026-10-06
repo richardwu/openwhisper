@@ -26,6 +26,9 @@ final class FluidAudioStreamingTranscriptionTests: XCTestCase {
             XCTAssertTrue(error is CancellationError)
         }
         try await decoder.prepare()
+        decoder.setSelected(false)
+        try await decoder.prepare()
+        decoder.setSelected(true)
     }
 
     func testLongParakeetDictationRemainsResponsiveAndFinishesPromptly() async throws {
@@ -88,6 +91,7 @@ final class FluidAudioStreamingTranscriptionTests: XCTestCase {
         var middleResidentMiB: Double?
         print("PARAKEET_LONG start duration_s=\(Double(samples.count * repetitions) / 16_000) rss_mib=\(initialResidentMiB)")
         service.begin()
+        decoder.setSelected(false)
         var fedSamples = 0
         for _ in 0..<repetitions {
             // The microphone's 4,096-frame tap at 48 kHz produces about 85 ms

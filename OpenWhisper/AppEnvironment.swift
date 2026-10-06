@@ -57,6 +57,7 @@ struct AppEnvironment {
         // model; the cache epoch prevents that session from refilling the cache.
         modelManager.onBackendChange = {
             nativeModelCache.invalidate()
+            parakeetService.setSelected(modelManager.selectedBackend == .parakeetUnified)
         }
         for backend in TranscriptionBackend.allCases {
             guard let family = backend.transcribeCppStreamFamily else { continue }
