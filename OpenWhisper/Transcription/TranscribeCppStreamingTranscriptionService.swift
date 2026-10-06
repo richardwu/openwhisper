@@ -255,6 +255,8 @@ private extension WhisperLanguage {
             case .turkish: return "tr-TR"
             case .polish: return "pl-PL"
             case .dutch: return "nl-NL"
+            // The model advertises ar-AR as its Arabic token (not a country selection).
+            // https://huggingface.co/handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf
             case .arabic: return "ar-AR"
             case .swedish: return "sv-SE"
             case .italian: return "it-IT"
@@ -264,12 +266,11 @@ private extension WhisperLanguage {
             case .romanian: return "ro-RO"
             case .danish: return "da-DK"
             case .hungarian: return "hu-HU"
-            case .thai: return "th-TH"
+            case .finnish: return "fi-FI"
             case .vietnamese: return "vi-VN"
             case .slovak: return "sk-SK"
             case .bulgarian: return "bg-BG"
-            case .lithuanian: return "lt-LT"
-            case .latvian: return "lv-LV"
+            case .croatian: return "hr-HR"
             case .estonian: return "et-EE"
             case .norwegian: return "nb-NO"
             default:

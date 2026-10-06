@@ -1,6 +1,43 @@
 import AVFoundation
 import os
 
+/// Tap callbacks buffer audio synchronously; stopping drains it before finalization.
+final class AudioCaptureBuffer: Sendable {
+    private struct State {
+        var samples: [Float] = []
+        var pending: [[Float]] = []
+        var accepting = true
+    }
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    func append(_ frames: [Float]) -> Bool {
+        state.withLock {
+            guard $0.accepting else { return false }
+            $0.samples.append(contentsOf: frames)
+            $0.pending.append(frames)
+            return true
+        }
+    }
+
+    func drain() -> [[Float]] {
+        state.withLock {
+            let pending = $0.pending
+            $0.pending.removeAll(keepingCapacity: true)
+            return pending
+        }
+    }
+
+    func finish() -> (samples: [Float], pending: [[Float]]) {
+        state.withLock {
+            $0.accepting = false
+            let result = ($0.samples, $0.pending)
+            $0.samples = []
+            $0.pending = []
+            return result
+        }
+    }
+}
+
 final class AudioLevelMeter: Sendable {
     private let _lock = OSAllocatedUnfairLock(initialState: Float(0))
 
@@ -23,7 +60,7 @@ final class AudioRecorder {
 
     @ObservationIgnored private let mode: Mode
     @ObservationIgnored private var engine: AVAudioEngine?
-    @ObservationIgnored private var samples: [Float] = []
+    @ObservationIgnored private var captureBuffer: AudioCaptureBuffer?
     @ObservationIgnored private let sampleRate: Double = 16000
     @ObservationIgnored var onAudioFrames: (([Float]) -> Void)?
 
@@ -41,7 +78,6 @@ final class AudioRecorder {
             try startLiveRecording()
         case .fixture:
             // Fixture mode: no-op on start, samples returned on stop
-            samples = []
             recentLevels = Array(repeating: 0.1, count: 30)
         }
     }
@@ -59,7 +95,6 @@ final class AudioRecorder {
     // MARK: - Live Implementation
 
     private func startLiveRecording() throws {
-        samples = []
         recentLevels = Array(repeating: 0, count: 30)
 
         let engine = AVAudioEngine()
@@ -82,12 +117,21 @@ final class AudioRecorder {
         }
 
         let meter = levelMeter
+        let capture = AudioCaptureBuffer()
+        captureBuffer = capture
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-            self?.convert(buffer: buffer, converter: converter, targetFormat: targetFormat, meter: meter)
+            self?.convert(buffer: buffer, converter: converter, targetFormat: targetFormat, meter: meter, capture: capture)
         }
 
         engine.prepare()
-        try engine.start()
+        do {
+            try engine.start()
+        } catch {
+            inputNode.removeTap(onBus: 0)
+            _ = capture.finish()
+            captureBuffer = nil
+            throw error
+        }
         self.engine = engine
 
         // 30fps timer to update recentLevels
@@ -110,17 +154,19 @@ final class AudioRecorder {
         engine?.inputNode.removeTap(onBus: 0)
         engine?.stop()
         engine = nil
-        let result = samples
-        samples = []
+        let result = captureBuffer?.finish()
+        captureBuffer = nil
+        for frames in result?.pending ?? [] { onAudioFrames?(frames) }
         recentLevels = Array(repeating: 0, count: 30)
-        return result
+        return result?.samples ?? []
     }
 
     private nonisolated func convert(
         buffer: AVAudioPCMBuffer,
         converter: AVAudioConverter,
         targetFormat: AVAudioFormat,
-        meter: AudioLevelMeter
+        meter: AudioLevelMeter,
+        capture: AudioCaptureBuffer
     ) {
         let frameCapacity = AVAudioFrameCount(
             Double(buffer.frameLength) * (targetFormat.sampleRate / buffer.format.sampleRate)
@@ -150,6 +196,7 @@ final class AudioRecorder {
             start: outputBuffer.floatChannelData?[0],
             count: Int(outputBuffer.frameLength)
         ))
+        guard !floatArray.isEmpty, capture.append(floatArray) else { return }
 
         // Compute RMS for level metering
         if !floatArray.isEmpty {
@@ -162,8 +209,8 @@ final class AudioRecorder {
         }
 
         Task { @MainActor [weak self] in
-            self?.samples.append(contentsOf: floatArray)
-            self?.onAudioFrames?(floatArray)
+            guard let self, self.captureBuffer === capture else { return }
+            for frames in capture.drain() { self.onAudioFrames?(frames) }
         }
     }
 }

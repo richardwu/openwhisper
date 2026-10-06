@@ -45,7 +45,9 @@ final class FluidAudioStreamingTranscriptionTests: XCTestCase {
                 latestPartial = text
             }
         }
-        try await decoder.prepare()
+        async let firstPreparation: Void = decoder.prepare()
+        async let secondPreparation: Void = decoder.prepare()
+        _ = try await (firstPreparation, secondPreparation)
 
         let clock = ContinuousClock()
         var maxHeartbeatGap = 0.0

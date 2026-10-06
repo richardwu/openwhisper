@@ -3,12 +3,23 @@ import SwiftWhisper
 @testable import OpenWhisper
 
 final class ModelCatalogTests: XCTestCase {
+    func testModelDownloadsArePinnedAndChecksumsRejectCorruptFiles() throws {
+        let urls = WhisperModel.allCases.map(\.downloadURL) + TranscribeCppModel.allCases.map(\.downloadURL)
+        XCTAssertTrue(urls.allSatisfy { !$0.path.contains("/resolve/main/") })
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: file) }
+        try Data("abc".utf8).write(to: file)
+        try ModelManager.verifyModel(at: file, expectedSHA256:
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+        XCTAssertThrowsError(try ModelManager.verifyModel(at: file, expectedSHA256: String(repeating: "0", count: 64)))
+    }
+
     func testLargeModelUsesAWhisperCppCheckpointSupportedByTheBundledRuntime() {
         XCTAssertEqual(WhisperModel.large.fileName, "ggml-large-v2-q5_0.bin")
         XCTAssertEqual(WhisperModel.large.downloadURL.host, "huggingface.co")
         XCTAssertEqual(
             WhisperModel.large.downloadURL.path,
-            "/ggerganov/whisper.cpp/resolve/main/ggml-large-v2-q5_0.bin"
+            "/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v2-q5_0.bin"
         )
         XCTAssertEqual(TranscriptionBackend.whisperLarge.whisperModel, .large)
         XCTAssertTrue(TranscriptionBackend.whisperLarge.requiresWhisperModel)
@@ -18,7 +29,7 @@ final class ModelCatalogTests: XCTestCase {
         for model in WhisperModel.allCases {
             XCTAssertTrue(model.fileName.hasSuffix(".bin"), model.rawValue)
             XCTAssertEqual(model.downloadURL.host, "huggingface.co", model.rawValue)
-            XCTAssertTrue(model.downloadURL.path.contains("/whisper.cpp/resolve/main/"), model.rawValue)
+            XCTAssertTrue(model.downloadURL.path.contains("/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/"), model.rawValue)
         }
     }
 
@@ -181,8 +192,8 @@ final class ModelCatalogTests: XCTestCase {
                 .auto, .english, .chinese, .german, .spanish, .russian, .korean,
                 .french, .japanese, .portuguese, .turkish, .polish, .dutch,
                 .arabic, .swedish, .italian, .hindi, .ukrainian, .czech,
-                .romanian, .danish, .hungarian, .thai, .vietnamese, .slovak,
-                .bulgarian, .lithuanian, .latvian, .estonian, .norwegian,
+                .romanian, .danish, .hungarian, .finnish, .vietnamese, .slovak,
+                .bulgarian, .croatian, .estonian, .norwegian,
             ]
         )
     }

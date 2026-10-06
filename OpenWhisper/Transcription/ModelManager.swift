@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import os
 import Speech
@@ -21,8 +22,18 @@ enum WhisperModel: String, CaseIterable {
     }
 
     var downloadURL: URL {
-        let base = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/"
+        let base = "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/"
         return URL(string: base + fileName)!
+    }
+
+    // SHA-256 from Hugging Face LFS metadata at the pinned revision.
+    var expectedSHA256: String {
+        switch self {
+        case .base: return "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe"
+        case .small: return "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb"
+        case .medium: return "19fea4b380c3a618ec4723c3eef2eb785ffba0d0538cf43f8f235e7b3b34220f"
+        case .large: return "3a214837221e4530dbc1fe8d734f302af393eb30bd0ed046042ebf4baf70f6f2"
+        }
     }
 
     var displayName: String {
@@ -74,15 +85,40 @@ enum TranscribeCppModel: String, CaseIterable {
             case .moonshineStreamingMedium: slug = "moonshine-streaming-medium"
             default: fatalError("unreachable")
             }
-            return URL(string: "https://huggingface.co/handy-computer/\(slug)-gguf/resolve/main/\(fileName)")!
+            return URL(string: "https://huggingface.co/handy-computer/\(slug)-gguf/resolve/\(revision)/\(fileName)")!
         case .nemotronSpeechStreaming:
-            return URL(string: "https://huggingface.co/handy-computer/nemotron-speech-streaming-en-0.6b-gguf/resolve/main/\(fileName)")!
+            return URL(string: "https://huggingface.co/handy-computer/nemotron-speech-streaming-en-0.6b-gguf/resolve/\(revision)/\(fileName)")!
         case .nemotron35Streaming:
-            return URL(string: "https://huggingface.co/handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/\(fileName)")!
+            return URL(string: "https://huggingface.co/handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/\(revision)/\(fileName)")!
         case .voxtralMiniRealtime:
-            return URL(string: "https://huggingface.co/handy-computer/Voxtral-Mini-4B-Realtime-2602-gguf/resolve/main/\(fileName)")!
+            return URL(string: "https://huggingface.co/handy-computer/Voxtral-Mini-4B-Realtime-2602-gguf/resolve/\(revision)/\(fileName)")!
         case .multitalkerParakeetStreaming:
-            return URL(string: "https://huggingface.co/handy-computer/multitalker-parakeet-streaming-0.6b-v1-gguf/resolve/main/bundle/\(fileName)")!
+            return URL(string: "https://huggingface.co/handy-computer/multitalker-parakeet-streaming-0.6b-v1-gguf/resolve/\(revision)/bundle/\(fileName)")!
+        }
+    }
+
+    // SHA-256 from Hugging Face LFS metadata at the pinned revision.
+    var expectedSHA256: String {
+        switch self {
+        case .moonshineStreamingTiny: return "930e4622ad3a24158b91406c30c977fa6a26b34cb32d6ac3e57cfb23383a869e"
+        case .moonshineStreamingSmall: return "d03670f69629b649085d0f44a63d97668b4119117cc9611a4e4ad94341713dfc"
+        case .moonshineStreamingMedium: return "f7c9564249b508f6012927ec4f9e536087da53a7047f858ca9975bea5f75299e"
+        case .nemotronSpeechStreaming: return "dc959ca31499b114e395c44eb4f0778968f20e5cfb03305a08a39925b2da8e1e"
+        case .nemotron35Streaming: return "41c99fa5fb6f3d35f68e79adc3e755eca2232a8d921178bd647b71194792b8fd"
+        case .voxtralMiniRealtime: return "39dc1f65539373a406edea7490505822d77c12edff521744678717eef4da4723"
+        case .multitalkerParakeetStreaming: return "d24307ac22e9e691c146a7e2339891638a44a8492a765e4b6c11cff8960cd998"
+        }
+    }
+
+    private var revision: String {
+        switch self {
+        case .moonshineStreamingTiny: return "f33fef628bc4d7ddb419384b1cf28ee83b662b06"
+        case .moonshineStreamingSmall: return "7e32b1b3dfce5d3a38dad59630ffce608f15c4aa"
+        case .moonshineStreamingMedium: return "0f99e956a9e63d591ddd7f2a20dfead255e96c68"
+        case .nemotronSpeechStreaming: return "9789e0ebf77277911272f0d9a35e1646b5aa6004"
+        case .nemotron35Streaming: return "8139c4ec14bdc45c361adf8d57c27c28e7478272"
+        case .voxtralMiniRealtime: return "65d1c9408859a0ca0f1c11b025ee951486af21d6"
+        case .multitalkerParakeetStreaming: return "a9a7208d8f205b5816770a6f7fb83afc81a7691b"
         }
     }
 
@@ -239,8 +275,8 @@ enum TranscriptionBackend: String, CaseIterable {
             .auto, .english, .chinese, .german, .spanish, .russian, .korean,
             .french, .japanese, .portuguese, .turkish, .polish, .dutch,
             .arabic, .swedish, .italian, .hindi, .ukrainian, .czech,
-            .romanian, .danish, .hungarian, .thai, .vietnamese, .slovak,
-            .bulgarian, .lithuanian, .latvian, .estonian, .norwegian,
+            .romanian, .danish, .hungarian, .finnish, .vietnamese, .slovak,
+            .bulgarian, .croatian, .estonian, .norwegian,
         ]
     }
 
@@ -543,7 +579,9 @@ final class ModelManager {
             ?? selectedBackend.transcribeCppModel?.fileName
         let downloadURL = selectedBackend.whisperModel?.downloadURL
             ?? selectedBackend.transcribeCppModel?.downloadURL
-        guard let fileName, let downloadURL else { return }
+        let expectedSHA256 = selectedBackend.whisperModel?.expectedSHA256
+            ?? selectedBackend.transcribeCppModel?.expectedSHA256
+        guard let fileName, let downloadURL, let expectedSHA256 else { return }
         let destinationURL = modelsDir.appendingPathComponent(fileName)
 
         isDownloading = true
@@ -574,10 +612,17 @@ final class ModelManager {
                 session.invalidateAndCancel()
             }
 
+            defer { try? FileManager.default.removeItem(at: tempURL) }
             guard let httpResponse = response as? HTTPURLResponse,
                   (200...299).contains(httpResponse.statusCode) else {
                 throw URLError(.badServerResponse)
             }
+
+            try await Task.detached(priority: .utility) {
+                try Self.verifyModel(at: tempURL, expectedSHA256: expectedSHA256)
+            }.value
+            try Task.checkCancellation()
+            guard self.downloadGeneration == generation else { return }
 
             if FileManager.default.fileExists(atPath: destinationURL.path) {
                 try FileManager.default.removeItem(at: destinationURL)
@@ -595,6 +640,21 @@ final class ModelManager {
             guard self.downloadGeneration == generation else { return }
             isDownloading = false
             errorMessage = "Download failed: \(error.localizedDescription)"
+        }
+    }
+
+    nonisolated static func verifyModel(at url: URL, expectedSHA256: String) throws {
+        let file = try FileHandle(forReadingFrom: url)
+        defer { try? file.close() }
+        var hash = SHA256()
+        while let chunk = try file.read(upToCount: 1_048_576), !chunk.isEmpty {
+            try Task.checkCancellation()
+            hash.update(data: chunk)
+        }
+        let digest = hash.finalize().map { String(format: "%02x", $0) }.joined()
+        guard digest == expectedSHA256 else {
+            throw NSError(domain: "OpenWhisper.ModelDownload", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "Model checksum does not match the pinned checkpoint"])
         }
     }
 
@@ -705,12 +765,14 @@ private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
         do {
             try FileManager.default.copyItem(at: location, to: tempFile)
             guard let response = downloadTask.response else {
+                try? FileManager.default.removeItem(at: tempFile)
                 continuation?.resume(throwing: URLError(.badServerResponse))
                 continuation = nil
                 return
             }
             continuation?.resume(returning: (tempFile, response))
         } catch {
+            try? FileManager.default.removeItem(at: tempFile)
             continuation?.resume(throwing: error)
         }
         continuation = nil

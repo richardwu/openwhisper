@@ -334,7 +334,7 @@ final class VocabularyStore {
             let key = Self.correctionKey(term)
             guard !key.isEmpty, seen.insert(key).inserted else { return nil }
             let learned = learnedKeys.contains(Self.comparisonKey(term))
-            let hasTechnicalSpelling = term.rangeOfCharacter(from: .uppercaseLetters) != nil ||
+            let hasTechnicalSpelling = term.dropFirst().contains(where: { $0.isUppercase }) ||
                 term.rangeOfCharacter(from: .decimalDigits) != nil ||
                 term.contains(where: { ".#+_-/&".contains($0) })
             // Fuzzy replacement of ordinary prose creates surprising edits.
@@ -349,17 +349,16 @@ final class VocabularyStore {
         }
     }
 
+    private static let correctionTokenRegex = try! NSRegularExpression(
+        pattern: "[\\p{L}\\p{N}][\\p{L}\\p{N}.+#&/_-]*"
+    )
+
     private static func correctionTokens(in text: String) -> [CorrectionToken] {
         // Keep punctuation outside a token. This lets us preserve sentence
         // punctuation and prevents matching across commas or parentheses.
-        guard let regex = try? NSRegularExpression(
-            pattern: "[\\p{L}\\p{N}][\\p{L}\\p{N}.+#&/_-]*",
-            options: []
-        ) else { return [] }
-
         let nsText = text as NSString
         let fullRange = NSRange(location: 0, length: nsText.length)
-        return regex.matches(in: text, options: [], range: fullRange).compactMap { match in
+        return correctionTokenRegex.matches(in: text, options: [], range: fullRange).compactMap { match in
             guard let range = Range(match.range, in: text) else { return nil }
             var end = range.upperBound
             // A sentence period or closing punctuation belongs outside the

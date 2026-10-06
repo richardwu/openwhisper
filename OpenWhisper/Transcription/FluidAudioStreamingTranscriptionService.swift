@@ -14,7 +14,7 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
     var onPreparationProgress: (@MainActor (Double) -> Void)?
 
     private let manager: StreamingUnifiedAsrManager
-    private var language: WhisperLanguage = .english
+    private var preparationTask: Task<Void, Error>?
     private var startupTask: Task<Void, Error>?
     private var processingTask: Task<Void, Never>?
     private var cleanupTask: Task<Void, Never>?
@@ -37,24 +37,32 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
     func prepare() async throws {
         if modelsLoaded { return }
 
-        try await manager.loadModels(
-            to: nil,
-            configuration: nil,
-            progressHandler: { progress in
-                let fraction = progress.fractionCompleted
-                Task { @MainActor [weak self] in
-                    self?.onPreparationProgress?(fraction)
+        if let preparationTask {
+            try await preparationTask.value
+            return
+        }
+        let task = Task {
+            try await manager.loadModels(
+                to: nil,
+                configuration: nil,
+                progressHandler: { progress in
+                    let fraction = progress.fractionCompleted
+                    Task { @MainActor [weak self] in
+                        self?.onPreparationProgress?(fraction)
+                    }
                 }
-            }
-        )
-        modelsLoaded = true
+            )
+            modelsLoaded = true
+        }
+        preparationTask = task
+        defer { preparationTask = nil }
+        try await task.value
     }
 
     func configure(language: WhisperLanguage) {
         // The selected Parakeet Unified checkpoint is English-only. Keep the
         // protocol's language parameter for parity with Apple's service, but
         // do not pass unsupported language identifiers into FluidAudio.
-        self.language = language == .english ? .english : .english
     }
 
     func configure(language: WhisperLanguage, modelURL: URL?) {

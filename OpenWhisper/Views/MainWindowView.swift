@@ -139,7 +139,7 @@ struct MainWindowView: View {
         }
 
         let preview = String(latestText.prefix(50))
-        return "Pasted: \(preview)\(latestText.count > 50 ? "..." : "")"
+        return "Latest: \(preview)\(latestText.count > 50 ? "..." : "")"
     }
 
     private func copyLatestTranscription() {

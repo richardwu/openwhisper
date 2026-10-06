@@ -124,6 +124,7 @@ final class VocabularyStoreTests: XCTestCase {
     }
 
     func testLocalCorrectionDoesNotRewriteUnrelatedProperName() {
+        XCTAssertEqual(store.correctTranscription("close the window and combine the metal instruments"), "close the window and combine the metal instruments")
         XCTAssertEqual(store.correctTranscription("Jason wrote a note."), "Jason wrote a note.")
         XCTAssertEqual(store.correctTranscription("finish the task."), "finish the task.")
         XCTAssertEqual(store.correctTranscription("That is nice."), "That is nice.")

@@ -44,7 +44,6 @@ final class AppState {
 
     private let launchConfig: LaunchConfiguration
     var isTestMode: Bool { launchConfig.isTestMode }
-    private var streamingDidFail = false
     private var recordingBackend: TranscriptionBackend?
 
     init(environment: AppEnvironment) {
@@ -184,7 +183,6 @@ final class AppState {
         do {
             try audioRecorder.startRecording()
             recordingBackend = modelManager.selectedBackend
-            streamingDidFail = false
             if modelManager.selectedBackend.isStreamingBackend {
                 streamingTranscriptionService?.configure(
                     language: modelManager.selectedLanguage,
@@ -233,11 +231,10 @@ final class AppState {
 
         var streamedText: String?
         if backend.isStreamingBackend,
-           let streamingTranscriptionService, !streamingDidFail {
+           let streamingTranscriptionService {
             do {
                 streamedText = try await streamingTranscriptionService.finish()
             } catch {
-                streamingDidFail = true
                 statusMessage = "\(backend.statusName) error: \(error.localizedDescription)"
                 overlayState.phase = .hidden
                 overlayController?.dismiss()

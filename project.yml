@@ -10,7 +10,7 @@ options:
 packages:
   SwiftWhisper:
     url: https://github.com/exPHAT/SwiftWhisper.git
-    branch: fast
+    revision: deb1cb6a27256c7b01f5d3d2e7dc1dcc330b5d01
   TranscribeCpp:
     path: Vendor/TranscribeCpp
   KeyboardShortcuts:
