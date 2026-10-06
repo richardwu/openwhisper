@@ -54,6 +54,8 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
     private let vocabularyStore: VocabularyStore?
     private let family: TranscribeCppStreamFamily
     private var configuredModelURL: URL?
+    private var cachedModel: TranscribeCpp.Model?
+    private var cachedModelURL: URL?
     private var configuredLanguage: WhisperLanguage = .english
 
     private var frameContinuation: AsyncStream<[Float]>.Continuation?
@@ -102,6 +104,7 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
         let language = configuredLanguage
         let family = family
         let candidateTerms = vocabularyStore?.candidateTerms ?? []
+        let cachedModel = cachedModelURL == modelURL ? cachedModel : nil
         let cancellationToken = TranscribeCpp.CancellationToken()
         nativeCancellationToken = cancellationToken
 
@@ -109,7 +112,8 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
             do {
                 await previousWorker?.value
                 try Task.checkCancellation()
-                let model = try TranscribeCpp.Model(path: modelURL.path)
+                let model = try cachedModel ?? TranscribeCpp.Model(path: modelURL.path)
+                await self?.cache(model, at: modelURL, generation: currentGeneration)
                 try Task.checkCancellation()
                 let runLanguage: String? = language.transcribeCppLanguageCode(for: family)
                 // Only pass native vocabulary when the loaded model advertises
@@ -204,6 +208,12 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
         didFail = false
     }
 
+    private func cache(_ model: TranscribeCpp.Model, at url: URL, generation: Int) {
+        guard generation == self.generation else { return }
+        cachedModel = model
+        cachedModelURL = url
+    }
+
     private func publish(_ text: String, generation: Int) {
         guard generation == self.generation, !text.isEmpty else { return }
         onPartialText?(text)
@@ -216,8 +226,9 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
         if case .failure = result { didFail = true }
         completedResult = result
         nativeCancellationToken = nil
+        // A resumed caller may begin again before native stream teardown.
+        cleanupWorker = worker
         worker = nil
-        cleanupWorker = nil
         if let completion {
             self.completion = nil
             completion.resume(with: result)

@@ -38,7 +38,12 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
         if modelsLoaded { return }
 
         if let preparationTask {
-            try await preparationTask.value
+            try await withTaskCancellationHandler {
+                try await preparationTask.value
+                try Task.checkCancellation()
+            } onCancel: {
+                preparationTask.cancel()
+            }
             return
         }
         let task = Task {
@@ -52,11 +57,17 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
                     }
                 }
             )
+            try Task.checkCancellation()
             modelsLoaded = true
         }
         preparationTask = task
         defer { preparationTask = nil }
-        try await task.value
+        try await withTaskCancellationHandler {
+            try await task.value
+            try Task.checkCancellation()
+        } onCancel: {
+            task.cancel()
+        }
     }
 
     func configure(language: WhisperLanguage) {
@@ -113,6 +124,7 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
     func finish() async throws -> String {
         acceptingFrames = false
         let currentGeneration = generation
+        defer { if currentGeneration == generation { cancel() } }
         try await startupTask?.value
         guard currentGeneration == generation else { throw CancellationError() }
         await processingTask?.value

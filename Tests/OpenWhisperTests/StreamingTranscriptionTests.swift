@@ -55,6 +55,31 @@ final class StreamingTranscriptionTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(service.cancelCount, 1)
     }
 
+    func testRestartDuringFinishCannotClearTheNewSession() async throws {
+        let service = StreamingServiceSpy(finalText: "Final")
+        let router = BackendStreamingTranscriptionService(
+            selectedBackend: { .appleStreaming }, services: [.appleStreaming: service]
+        )
+        service.holdFinish = true
+        router.begin()
+        let oldFinish = Task { try await router.finish() }
+        while service.heldFinish == nil { await Task.yield() }
+        router.begin()
+        service.holdFinish = false
+        service.heldFinish?.resume(returning: "Old final")
+        service.heldFinish = nil
+        do {
+            _ = try await oldFinish.value
+            XCTFail("The previous session must be cancelled")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+        router.append(audioFrames: [0.5])
+        let text = try await router.finish()
+        XCTAssertEqual(text, "Final")
+        XCTAssertEqual(service.receivedFrames, [[0.5]])
+    }
+
     func testPreviewBurstKeepsTheNewestTextWithoutAProcessingBacklog() async throws {
         let service = StreamingServiceSpy(finalText: "Final raw transcript")
         let router = BackendStreamingTranscriptionService(
@@ -177,6 +202,8 @@ private final class StreamingServiceSpy: StreamingTranscriptionService {
     private(set) var receivedFrames: [[Float]] = []
     private(set) var finishCount = 0
     private(set) var cancelCount = 0
+    var holdFinish = false
+    var heldFinish: CheckedContinuation<String, Error>?
 
     init(finalText: String) { self.finalText = finalText }
     func configure(language: WhisperLanguage) {}
@@ -184,6 +211,9 @@ private final class StreamingServiceSpy: StreamingTranscriptionService {
     func append(audioFrames: [Float]) { receivedFrames.append(audioFrames) }
     func finish() async throws -> String {
         finishCount += 1
+        if holdFinish {
+            return try await withCheckedThrowingContinuation { heldFinish = $0 }
+        }
         return finalText
     }
     func cancel() { cancelCount += 1 }

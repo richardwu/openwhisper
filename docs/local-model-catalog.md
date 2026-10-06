@@ -42,6 +42,10 @@ Potential future backends:
   Parakeet TDT, Parakeet EOU, SenseVoice, and Nemotron models. Parakeet Unified
   is already selectable. Its model cache is
   `~/Library/Application Support/FluidAudio/Models/`.
+  FluidAudio 0.17.5 manages these downloads and its cache checks. OpenWhisper
+  does not pin or verify the Core ML weight files itself; it trusts
+  FluidAudio's model publisher and download mechanism. The app's GGUF and
+  Whisper downloads instead use pinned revisions and SHA-256 checks.
 - [Handy transcribe.cpp](https://github.com/handy-computer/transcribe.cpp) for
   Moonshine Streaming, Nemotron, Voxtral Realtime, Multitalker Parakeet, and
   other GGUF model families. The streaming families above are selectable

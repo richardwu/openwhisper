@@ -30,17 +30,21 @@ final class MoonshineStreamingTranscriptionTests: XCTestCase {
             if !text.isEmpty { partials.append(text) }
         }
 
-        service.configure(language: .english, modelURL: modelURL)
-        service.begin()
-        for start in stride(from: 0, to: samples.count, by: 3_200) {
-            let end = min(start + 3_200, samples.count)
-            service.append(audioFrames: Array(samples[start..<end]))
-        }
-        let text = try await service.finish().lowercased()
+        // The second recording reuses the model with a fresh native session.
+        for _ in 0..<2 {
+            service.configure(language: .english, modelURL: modelURL)
+            partials.removeAll()
+            service.begin()
+            for start in stride(from: 0, to: samples.count, by: 3_200) {
+                let end = min(start + 3_200, samples.count)
+                service.append(audioFrames: Array(samples[start..<end]))
+            }
+            let text = try await service.finish().lowercased()
 
-        XCTAssertFalse(partials.isEmpty, "Moonshine should publish a partial transcript")
-        XCTAssertTrue(text.contains("this is me testing"), "Unexpected final text: \(text)")
-        XCTAssertTrue(text.contains("work properly"), "Unexpected final text: \(text)")
+            XCTAssertFalse(partials.isEmpty, "Moonshine should publish a partial transcript")
+            XCTAssertTrue(text.contains("this is me testing"), "Unexpected final text: \(text)")
+            XCTAssertTrue(text.contains("work properly"), "Unexpected final text: \(text)")
+        }
     }
 
     private func readSamples(url: URL) throws -> [Float] {

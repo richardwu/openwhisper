@@ -18,6 +18,7 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
     private var continuation: AsyncStream<AnalyzerInput>.Continuation?
     private var resultsTask: Task<Void, Never>?
     private var audioFormat: AVAudioFormat?
+    private var audioConverter: AVAudioConverter?
     private var pendingFrames: [[Float]] = []
     private var finalText = ""
     private var volatileText = ""
@@ -119,6 +120,7 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         analyzer = nil
         transcriber = nil
         audioFormat = nil
+        audioConverter = nil
         pendingFrames.removeAll(keepingCapacity: false)
         finalText = ""
         volatileText = ""
@@ -177,6 +179,12 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
 
         self.transcriber = transcriber
         self.analyzer = analyzer
+        let inputFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000,
+                                        channels: 1, interleaved: false)!
+        guard let converter = AVAudioConverter(from: inputFormat, to: format) else {
+            throw AudioRecorderError.converterCreationFailed
+        }
+        self.audioConverter = converter
         self.audioFormat = format
         self.continuation = continuation
         resultsTask = Task { [weak self, transcriber] in
@@ -190,15 +198,13 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
             }
         }
 
+        // Queue older frames before start() suspends and append() can run.
+        for frames in pendingFrames {
+            yield(frames, into: continuation, format: format)
+        }
+        pendingFrames.removeAll(keepingCapacity: false)
         try await analyzer.start(inputSequence: stream)
         try checkSession(generation: generation)
-
-        if let continuation = self.continuation, let format = self.audioFormat {
-            for frames in pendingFrames {
-                yield(frames, into: continuation, format: format)
-            }
-            pendingFrames.removeAll(keepingCapacity: false)
-        }
     }
 
     private func yield(
@@ -206,23 +212,39 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         into continuation: AsyncStream<AnalyzerInput>.Continuation,
         format: AVAudioFormat
     ) {
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames.count)) else { return }
-        buffer.frameLength = AVAudioFrameCount(frames.count)
-        if let destination = buffer.floatChannelData?[0] {
-            frames.withUnsafeBufferPointer { source in
-                destination.update(from: source.baseAddress!, count: frames.count)
-            }
-        } else if let destination = buffer.int16ChannelData?[0] {
-            for (index, sample) in frames.enumerated() {
-                let clamped = max(-1, min(1, sample))
-                destination[index] = Int16(clamped * Float(Int16.max))
-            }
-        } else {
+        guard let converter = audioConverter,
+              let input = AVAudioPCMBuffer(pcmFormat: converter.inputFormat,
+                                           frameCapacity: AVAudioFrameCount(frames.count)),
+              let destination = input.floatChannelData?[0] else {
+            didFail = true
             return
         }
+        input.frameLength = AVAudioFrameCount(frames.count)
+        frames.withUnsafeBufferPointer { destination.update(from: $0.baseAddress!, count: frames.count) }
+        let capacity = AVAudioFrameCount(ceil(Double(frames.count) * format.sampleRate / 16_000)) + 1024
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else {
+            didFail = true
+            return
+        }
+        var consumed = false
+        var error: NSError?
+        let status = converter.convert(to: buffer, error: &error) { _, status in
+            guard !consumed else {
+                status.pointee = .noDataNow
+                return nil
+            }
+            consumed = true
+            status.pointee = .haveData
+            return input
+        }
+        guard error == nil, status != .error else {
+            didFail = true
+            return
+        }
+        guard buffer.frameLength > 0 else { return }
         let start = CMTime(value: frameOffset, timescale: CMTimeScale(format.sampleRate))
         continuation.yield(AnalyzerInput(buffer: buffer, bufferStartTime: start))
-        frameOffset += Int64(frames.count)
+        frameOffset += Int64(buffer.frameLength)
     }
 
     private func consume(_ result: SpeechTranscriber.Result) {
