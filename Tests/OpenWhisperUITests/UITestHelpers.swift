@@ -30,6 +30,15 @@ extension XCUIApplication {
 
 extension XCUIElement {
     /// Resolve identifiers without depending on how SwiftUI exposes a view's role.
+    func historyElement(_ action: String, text: String) -> XCUIElement {
+        let entry = descendants(matching: .any).matching(NSPredicate(
+            format: "identifier BEGINSWITH %@ AND (label == %@ OR value == %@)",
+            "history.entry.", text, text
+        )).firstMatch
+        if action == "entry" { return entry }
+        return element(entry.identifier.replacingOccurrences(of: "history.entry.", with: "history.\(action)."))
+    }
+
     func element(_ identifier: String) -> XCUIElement {
         descendants(matching: .any).matching(identifier: identifier).firstMatch
     }

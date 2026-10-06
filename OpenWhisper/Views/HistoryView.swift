@@ -42,7 +42,7 @@ struct HistoryView: View {
                                 .font(.body)
                                 .lineLimit(4)
                                 .textSelection(.enabled)
-                                .accessibilityIdentifier(LaunchConfiguration.current.isTestMode ? "history.entry.\(entry.text)" : "history.entry.\(entry.id)")
+                                .accessibilityIdentifier("history.entry.\(entry.id)")
 
                             HStack {
                                 Text(relativeTime(from: entry.date))
@@ -66,7 +66,7 @@ struct HistoryView: View {
                                 .buttonStyle(.borderless)
                                 .help("Copy to clipboard")
                                 .accessibilityLabel("Copy transcription")
-                                .accessibilityIdentifier(LaunchConfiguration.current.isTestMode ? "history.copy.\(entry.text)" : "history.copy.\(entry.id)")
+                                .accessibilityIdentifier("history.copy.\(entry.id)")
 
                                 Button {
                                     entryToDelete = entry
@@ -78,7 +78,7 @@ struct HistoryView: View {
                                 .buttonStyle(.borderless)
                                 .help("Delete")
                                 .accessibilityLabel("Delete transcription")
-                                .accessibilityIdentifier(LaunchConfiguration.current.isTestMode ? "history.delete.\(entry.text)" : "history.delete.\(entry.id)")
+                                .accessibilityIdentifier("history.delete.\(entry.id)")
                             }
                         }
                         .padding(.vertical, 4)

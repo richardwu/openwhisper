@@ -22,10 +22,16 @@ final class StreamingTranscriptionTests: XCTestCase {
             decoder.onFailure = { _ in failures += 1 }
             decoder.begin()
             // The main actor has not yielded to preparation yet.
-            decoder.append(audioFrames: [Float](repeating: 0, count: 16_000 * 180 + 1))
+            decoder.append(audioFrames: [Float](repeating: 0, count: 16_000 * 180))
+            XCTAssertEqual(failures, 0)
+            decoder.append(audioFrames: [0])
             XCTAssertEqual(failures, 1)
             decoder.append(audioFrames: [0])
             XCTAssertEqual(failures, 1)
+            decoder.cancel()
+            decoder.begin()
+            decoder.append(audioFrames: [0])
+            XCTAssertEqual(failures, 1, "Restart must clear the cold-start count")
             decoder.cancel()
         }
     }

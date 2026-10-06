@@ -23,6 +23,7 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
     private var audioFormat: AVAudioFormat?
     private var audioConverter: AVAudioConverter?
     private var pendingFrames: [[Float]] = []
+    private var pendingFrameCount = 0
     private var finalText = ""
     private var volatileText = ""
     private var frameOffset: Int64 = 0
@@ -58,6 +59,7 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         let cleanup = cleanupTask
         acceptingFrames = true
         pendingFrames = []
+        pendingFrameCount = 0
         finalText = ""
         volatileText = ""
         frameOffset = 0
@@ -84,14 +86,16 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         guard let continuation, let audioFormat else {
             // ponytail: cap cold preparation at three minutes of 16 kHz audio;
             // preinstall assets if first-use preparation needs longer.
-            guard pendingFrames.reduce(0, { $0 + $1.count }) + audioFrames.count <= 16_000 * 180 else {
+            guard pendingFrameCount + audioFrames.count <= 16_000 * 180 else {
                 didFail = true
                 acceptingFrames = false
                 pendingFrames.removeAll(keepingCapacity: false)
+                pendingFrameCount = 0
                 onFailure?(NSError(domain: "OpenWhisper.AppleStreaming", code: 4,
                     userInfo: [NSLocalizedDescriptionKey: "Apple speech preparation exceeded the audio buffer limit. Please try again."]))
                 return
             }
+            pendingFrameCount += audioFrames.count
             pendingFrames.append(audioFrames)
             return
         }
@@ -122,6 +126,7 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
             }
         }
         pendingFrames.removeAll(keepingCapacity: false)
+        pendingFrameCount = 0
         continuation?.finish()
         continuation = nil
 
@@ -158,6 +163,7 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         audioFormat = nil
         audioConverter = nil
         pendingFrames.removeAll(keepingCapacity: false)
+        pendingFrameCount = 0
         finalText = ""
         volatileText = ""
         lastPartial = ""
@@ -246,6 +252,7 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
             yield(frames, into: continuation, format: format)
         }
         pendingFrames.removeAll(keepingCapacity: false)
+        pendingFrameCount = 0
         try checkSession(generation: generation)
         try await analyzer.start(inputSequence: stream)
         try checkSession(generation: generation)

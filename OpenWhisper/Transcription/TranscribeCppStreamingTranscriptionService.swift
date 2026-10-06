@@ -53,6 +53,7 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
     var onStatusChange: ((String) -> Void)?
     private var queuedFrameCount = 0
     private var isFinishing = false
+    private var showingBacklog = false
 
     private let modelURLProvider: @MainActor () -> URL?
     private let vocabularyStore: VocabularyStore?
@@ -169,8 +170,8 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
                     try Task.checkCancellation()
                     _ = try stream.feed(frame)
                     let text = stream.text.display
-                    let changedText = text != lastPartial ? text : ""
-                    lastPartial = text
+                    let changedText = !text.isEmpty && text != lastPartial ? text : ""
+                    if !text.isEmpty { lastPartial = text }
                     await self?.processed(frameCount: frame.count, text: changedText, generation: currentGeneration)
                 }
 
@@ -201,14 +202,13 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
             throw Self.unavailableError("\(family.displayName) streaming did not start")
         }
 
+        if let completedResult {
+            return try completedResult.get()
+        }
         isFinishing = true
         reportBacklog()
         frameContinuation?.finish()
         frameContinuation = nil
-
-        if let completedResult {
-            return try completedResult.get()
-        }
 
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
@@ -231,6 +231,7 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
         generation &+= 1
         queuedFrameCount = 0
         isFinishing = false
+        showingBacklog = false
         frameContinuation?.finish()
         frameContinuation = nil
         cleanupWorker = worker ?? cleanupWorker
@@ -269,12 +270,19 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
         if isFinishing {
             onStatusChange?(seconds > 0 ? "Processing... \(seconds)s of audio queued" : "Processing...")
         } else if seconds >= 5 {
+            showingBacklog = true
             onStatusChange?("Recording... \(seconds)s of audio queued")
+        } else if showingBacklog {
+            showingBacklog = false
+            onStatusChange?("Recording...")
         }
     }
 
     private func complete(result: Result<String, Error>, generation: Int) {
         guard generation == self.generation else { return }
+        queuedFrameCount = 0
+        isFinishing = false
+        showingBacklog = false
         frameContinuation?.finish()
         frameContinuation = nil
         if case .failure = result { didFail = true }

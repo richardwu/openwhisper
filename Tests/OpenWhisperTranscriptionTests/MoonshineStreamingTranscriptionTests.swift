@@ -60,6 +60,15 @@ final class MoonshineStreamingTranscriptionTests: XCTestCase {
                 let end = min(start + 3_200, samples.count)
                 service.append(audioFrames: Array(samples[start..<end]))
             }
+            if recording == 0 {
+                // Let the warm worker catch up while recording stays active.
+                for _ in 0..<200 where !statuses.contains("Recording...") {
+                    try await Task.sleep(for: .milliseconds(20))
+                }
+                XCTAssertTrue(statuses.contains { $0.hasPrefix("Recording...") && $0.contains("audio queued") })
+                XCTAssertEqual(statuses.last, "Recording...", "A drained backlog must clear its warning")
+                service.append(audioFrames: [0])
+            }
             let text = try await service.finish().lowercased()
 
             if recording == 1 {
@@ -71,6 +80,8 @@ final class MoonshineStreamingTranscriptionTests: XCTestCase {
                           "Stop should report the ordered audio backlog")
             XCTAssertEqual(statuses.last, "Processing...")
             XCTAssertFalse(partials.isEmpty, "Moonshine should publish a partial transcript")
+            XCTAssertTrue(zip(partials, partials.dropFirst()).allSatisfy { $0 != $1 },
+                          "Unchanged native previews must not be republished")
             XCTAssertTrue(text.contains("this is me testing"), "Unexpected final text: \(text)")
             XCTAssertTrue(text.contains("work properly"), "Unexpected final text: \(text)")
         }

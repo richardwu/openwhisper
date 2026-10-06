@@ -239,8 +239,8 @@ final class OpenWhisperUITests: XCTestCase {
         waitForValue("Latest transcription copied", on: copy)
 
         navigate("history")
-        assertVisible(window.element("history.entry.Hello world"), in: window)
-        copyAndVerify(window.element("history.copy.Hello world"), expected: "Hello world")
+        assertVisible(window.historyElement("entry", text: "Hello world"), in: window)
+        copyAndVerify(window.historyElement("copy", text: "Hello world"), expected: "Hello world")
         assertNavigationAndFooter()
     }
 
@@ -283,20 +283,22 @@ final class OpenWhisperUITests: XCTestCase {
         launch(.historyManagement)
         navigate("history")
         for text in ["Third entry", "Second entry", "First entry"] {
-            assertVisible(window.element("history.entry.\(text)"), in: window)
+            assertVisible(window.historyElement("entry", text: text), in: window)
         }
-        copyAndVerify(window.element("history.copy.Second entry"), expected: "Second entry")
+        let entryID = window.historyElement("entry", text: "Second entry").identifier
+        XCTAssertNotNil(UUID(uuidString: entryID.replacingOccurrences(of: "history.entry.", with: "")))
+        copyAndVerify(window.historyElement("copy", text: "Second entry"), expected: "Second entry")
 
-        window.element("history.delete.Second entry").click()
+        window.historyElement("delete", text: "Second entry").click()
         // macOS exposes SwiftUI confirmation alerts as sheets, not Alert nodes.
         let deletionSheet = window.sheets.containing(.button, identifier: "Delete").firstMatch
         XCTAssertTrue(deletionSheet.waitForExistence(timeout: 5))
         deletionSheet.buttons["Cancel"].click()
-        XCTAssertTrue(window.element("history.entry.Second entry").exists)
-        window.element("history.delete.Second entry").click()
+        XCTAssertTrue(window.historyElement("entry", text: "Second entry").exists)
+        window.historyElement("delete", text: "Second entry").click()
         XCTAssertTrue(deletionSheet.waitForExistence(timeout: 5))
         deletionSheet.buttons["Delete"].click()
-        XCTAssertFalse(window.element("history.entry.Second entry").exists)
+        XCTAssertFalse(window.historyElement("entry", text: "Second entry").exists)
 
         window.element("history.deleteAll").click()
         let deleteAllSheet = window.sheets.containing(.button, identifier: "Delete All").firstMatch
