@@ -146,7 +146,7 @@ jobs:
 
       - name: Run real transcription tests
         env:
-          OPENWHISPER_MODEL_PATH: ${{ github.workspace }}/.build/models/ggml-base.bin
+          TEST_RUNNER_OPENWHISPER_MODEL_PATH: ${{ github.workspace }}/.build/models/ggml-base.bin
         run: |
           xcodebuild test \
             -scheme OpenWhisper \
