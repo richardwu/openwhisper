@@ -90,6 +90,17 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
             for frames in pendingFrames {
                 yield(frames, into: continuation, format: audioFormat)
             }
+            if let audioConverter {
+                do {
+                    while true {
+                        let tail = try Self.convertedBuffer(input: nil, using: audioConverter)
+                        guard tail.frameLength > 0 else { break }
+                        yield(tail, into: continuation)
+                    }
+                } catch {
+                    didFail = true
+                }
+            }
         }
         pendingFrames.removeAll(keepingCapacity: false)
         continuation?.finish()
@@ -221,14 +232,36 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         }
         input.frameLength = AVAudioFrameCount(frames.count)
         frames.withUnsafeBufferPointer { destination.update(from: $0.baseAddress!, count: frames.count) }
-        let capacity = AVAudioFrameCount(ceil(Double(frames.count) * format.sampleRate / 16_000)) + 1024
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else {
+        do {
+            let buffer = try Self.convertedBuffer(input: input, using: converter)
+            yield(buffer, into: continuation)
+        } catch {
+            // Audio cannot be dropped safely. Fail the recording explicitly.
             didFail = true
-            return
+        }
+    }
+
+    private func yield(_ buffer: AVAudioPCMBuffer, into continuation: AsyncStream<AnalyzerInput>.Continuation) {
+        guard buffer.frameLength > 0 else { return }
+        let start = CMTime(value: frameOffset, timescale: CMTimeScale(buffer.format.sampleRate))
+        continuation.yield(AnalyzerInput(buffer: buffer, bufferStartTime: start))
+        frameOffset += Int64(buffer.frameLength)
+    }
+
+    /// A nil input drains the resampler's buffered tail at end of recording.
+    static func convertedBuffer(input: AVAudioPCMBuffer?, using converter: AVAudioConverter) throws -> AVAudioPCMBuffer {
+        let capacity = AVAudioFrameCount(ceil(Double(input?.frameLength ?? 0)
+            * converter.outputFormat.sampleRate / converter.inputFormat.sampleRate)) + 1024
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: converter.outputFormat, frameCapacity: capacity) else {
+            throw AudioRecorderError.converterCreationFailed
         }
         var consumed = false
         var error: NSError?
         let status = converter.convert(to: buffer, error: &error) { _, status in
+            guard let input else {
+                status.pointee = .endOfStream
+                return nil
+            }
             guard !consumed else {
                 status.pointee = .noDataNow
                 return nil
@@ -237,14 +270,9 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
             status.pointee = .haveData
             return input
         }
-        guard error == nil, status != .error else {
-            didFail = true
-            return
-        }
-        guard buffer.frameLength > 0 else { return }
-        let start = CMTime(value: frameOffset, timescale: CMTimeScale(format.sampleRate))
-        continuation.yield(AnalyzerInput(buffer: buffer, bufferStartTime: start))
-        frameOffset += Int64(buffer.frameLength)
+        if let error { throw error }
+        guard status != .error else { throw AudioRecorderError.converterCreationFailed }
+        return buffer
     }
 
     private func consume(_ result: SpeechTranscriber.Result) {

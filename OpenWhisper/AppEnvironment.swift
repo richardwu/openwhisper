@@ -52,12 +52,14 @@ struct AppEnvironment {
         var streamingServices: [TranscriptionBackend: any StreamingTranscriptionService] = [
             .parakeetUnified: parakeetService,
         ]
+        let nativeModelCache = TranscribeCppStreamingTranscriptionService.ModelCache()
         for backend in TranscriptionBackend.allCases {
             guard let family = backend.transcribeCppStreamFamily else { continue }
             streamingServices[backend] = TranscribeCppStreamingTranscriptionService(
                 modelURLProvider: { @MainActor in modelManager.modelFileURL },
                 vocabularyStore: vocabularyStore,
-                family: family
+                family: family,
+                modelCache: nativeModelCache
             )
         }
         if #available(macOS 26.0, *) {

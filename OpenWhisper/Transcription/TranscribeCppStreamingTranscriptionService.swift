@@ -54,8 +54,13 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
     private let vocabularyStore: VocabularyStore?
     private let family: TranscribeCppStreamFamily
     private var configuredModelURL: URL?
-    private var cachedModel: TranscribeCpp.Model?
-    private var cachedModelURL: URL?
+    /// Shared by production decoders, owned by their environment rather than
+    /// process globals so native resources are released before Metal shutdown.
+    final class ModelCache {
+        var model: TranscribeCpp.Model?
+        var url: URL?
+    }
+    private let modelCache: ModelCache
     private var configuredLanguage: WhisperLanguage = .english
 
     private var frameContinuation: AsyncStream<[Float]>.Continuation?
@@ -70,11 +75,13 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
     init(
         modelURLProvider: @escaping @MainActor () -> URL?,
         vocabularyStore: VocabularyStore? = nil,
-        family: TranscribeCppStreamFamily = .moonshineStreaming
+        family: TranscribeCppStreamFamily = .moonshineStreaming,
+        modelCache: ModelCache = ModelCache()
     ) {
         self.modelURLProvider = modelURLProvider
         self.vocabularyStore = vocabularyStore
         self.family = family
+        self.modelCache = modelCache
     }
 
     func configure(language: WhisperLanguage) {
@@ -104,7 +111,7 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
         let language = configuredLanguage
         let family = family
         let candidateTerms = vocabularyStore?.candidateTerms ?? []
-        let cachedModel = cachedModelURL == modelURL ? cachedModel : nil
+        let cachedModel = modelCache.url == modelURL ? modelCache.model : nil
         let cancellationToken = TranscribeCpp.CancellationToken()
         nativeCancellationToken = cancellationToken
 
@@ -210,8 +217,12 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
 
     private func cache(_ model: TranscribeCpp.Model, at url: URL, generation: Int) {
         guard generation == self.generation else { return }
-        cachedModel = model
-        cachedModelURL = url
+        // Keep one checkpoint across all backend instances. Release native
+        // weights on a worker when another checkpoint replaces the cache.
+        let previous = modelCache.model
+        modelCache.model = model
+        modelCache.url = url
+        Task.detached { withExtendedLifetime(previous) {} }
     }
 
     private func publish(_ text: String, generation: Int) {

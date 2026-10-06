@@ -8,6 +8,26 @@ import XCTest
 /// It skips clean machines because the first run downloads roughly 600 MB.
 @MainActor
 final class FluidAudioStreamingTranscriptionTests: XCTestCase {
+    func testCancelledPreparationWaiterDoesNotCancelTheOwner() async throws {
+        guard FluidAudioModelSupport.modelsAreAvailable else {
+            throw XCTSkip("Parakeet Unified is not cached locally")
+        }
+        let decoder = FluidAudioStreamingTranscriptionService()
+        let owner = Task { try await decoder.prepare() }
+        await Task.yield()
+        let waiter = Task { try await decoder.prepare() }
+        await Task.yield()
+        waiter.cancel()
+        try await owner.value
+        do {
+            try await waiter.value
+            XCTFail("The cancelled waiter must report cancellation")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+        try await decoder.prepare()
+    }
+
     func testLongParakeetDictationRemainsResponsiveAndFinishesPromptly() async throws {
         guard ProcessInfo.processInfo.environment["OPENWHISPER_HEADLESS_TESTS"] == "1" else {
             throw XCTSkip("Run scripts/test_background.sh --real-models to prevent screen interaction")

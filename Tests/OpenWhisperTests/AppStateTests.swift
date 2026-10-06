@@ -75,6 +75,21 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(state.pasteService.pastedTexts, ["Hello world"])
     }
 
+    func testCancelledToggleIgnoresHeldKeyUntilRelease() async {
+        let state = makeAppState(scenario: .recordToTranscribeSuccess)
+        await state.toggleRecording()
+        state.recordingHotkeyDown()
+        state.cancelRecording()
+        state.recordingHotkeyDown()
+        await state.recordingHotkeyUp()
+        XCTAssertFalse(state.isRecording)
+        XCTAssertTrue(state.pasteService.pastedTexts.isEmpty)
+        state.recordingHotkeyDown()
+        await state.recordingHotkeyUp()
+        XCTAssertTrue(state.isRecording)
+        state.cancelRecording()
+    }
+
     func testHoldWithDeniedMicrophoneDoesNotStartOnRelease() async {
         let state = makeAppState(scenario: .micDenied)
         state.recordingTriggerMode = .pressAndHold

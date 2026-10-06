@@ -35,38 +35,42 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
     /// recording lets the model picker report real readiness and avoids doing
     /// the first Core ML compile after the user starts speaking.
     func prepare() async throws {
-        if modelsLoaded { return }
-
-        if let preparationTask {
+        try Task.checkCancellation()
+        while !modelsLoaded {
+            try Task.checkCancellation()
+            if let preparationTask {
+                do {
+                    try await preparationTask.value
+                } catch is CancellationError {
+                    // The owner cancelled. A still-active waiter can retry.
+                    try Task.checkCancellation()
+                    continue
+                }
+                try Task.checkCancellation()
+                continue
+            }
+            let task = Task {
+                defer { preparationTask = nil }
+                try await manager.loadModels(
+                    to: nil,
+                    configuration: nil,
+                    progressHandler: { progress in
+                        let fraction = progress.fractionCompleted
+                        Task { @MainActor [weak self] in
+                            self?.onPreparationProgress?(fraction)
+                        }
+                    }
+                )
+                // Retain a completed load even if its caller was cancelled.
+                modelsLoaded = true
+            }
+            preparationTask = task
             try await withTaskCancellationHandler {
-                try await preparationTask.value
+                try await task.value
                 try Task.checkCancellation()
             } onCancel: {
-                preparationTask.cancel()
+                task.cancel()
             }
-            return
-        }
-        let task = Task {
-            try await manager.loadModels(
-                to: nil,
-                configuration: nil,
-                progressHandler: { progress in
-                    let fraction = progress.fractionCompleted
-                    Task { @MainActor [weak self] in
-                        self?.onPreparationProgress?(fraction)
-                    }
-                }
-            )
-            try Task.checkCancellation()
-            modelsLoaded = true
-        }
-        preparationTask = task
-        defer { preparationTask = nil }
-        try await withTaskCancellationHandler {
-            try await task.value
-            try Task.checkCancellation()
-        } onCancel: {
-            task.cancel()
         }
     }
 
@@ -124,38 +128,42 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
     func finish() async throws -> String {
         acceptingFrames = false
         let currentGeneration = generation
-        defer { if currentGeneration == generation { cancel() } }
-        try await startupTask?.value
-        guard currentGeneration == generation else { throw CancellationError() }
-        await processingTask?.value
-        guard currentGeneration == generation else { throw CancellationError() }
+        do {
+            try await startupTask?.value
+            guard currentGeneration == generation else { throw CancellationError() }
+            await processingTask?.value
+            guard currentGeneration == generation else { throw CancellationError() }
 
-        guard !didFail else {
-            throw NSError(
-                domain: "OpenWhisper.FluidAudio",
-                code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Parakeet Unified is unavailable"]
-            )
-        }
+            guard !didFail else {
+                throw NSError(
+                    domain: "OpenWhisper.FluidAudio",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "Parakeet Unified is unavailable"]
+                )
+            }
 
-        // AppState runs the completed text through TranscriptionService's
-        // shared filtering and correction path. Keep this return value raw so
-        // the local vocabulary is applied exactly once before paste/history.
-        let manager = self.manager
-        let task = Task {
-            try Task.checkCancellation()
-            let text = try await manager.finish()
-            _ = await manager.consumeTokenTimings()
-            try await manager.reset()
+            // AppState runs the completed text through TranscriptionService's
+            // shared filtering and correction path. Keep this return value raw so
+            // the local vocabulary is applied exactly once before paste/history.
+            let manager = self.manager
+            let task = Task {
+                try Task.checkCancellation()
+                let text = try await manager.finish()
+                _ = await manager.consumeTokenTimings()
+                try await manager.reset()
+                return text
+            }
+            finishingTask = task
+            let text = try await task.value
+            guard currentGeneration == generation else { throw CancellationError() }
+            finishingTask = nil
+            startupTask = nil
+            lastPartial = ""
             return text
+        } catch {
+            if currentGeneration == generation { cancel() }
+            throw error
         }
-        finishingTask = task
-        let text = try await task.value
-        guard currentGeneration == generation else { throw CancellationError() }
-        finishingTask = nil
-        startupTask = nil
-        lastPartial = ""
-        return text
     }
 
     func cancel() {

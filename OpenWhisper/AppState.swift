@@ -31,6 +31,7 @@ final class AppState {
     private let defaults: UserDefaults
     private var activeHotkeyMode: RecordingTriggerMode?
     private var hotkeyStartedRecording = false
+    private var hotkeyWasCancelled = false
 
     let audioRecorder: AudioRecorder
     let streamingTranscriptionService: (any StreamingTranscriptionService)?
@@ -114,8 +115,11 @@ final class AppState {
     func recordingHotkeyUp() async {
         guard let mode = activeHotkeyMode else { return }
         activeHotkeyMode = nil
+        let wasCancelled = hotkeyWasCancelled
+        hotkeyWasCancelled = false
         let shouldStop = hotkeyStartedRecording
         hotkeyStartedRecording = false
+        guard !wasCancelled else { return }
         if mode == .toggle {
             await toggleRecording()
         } else if shouldStop && isRecording {
@@ -134,6 +138,8 @@ final class AppState {
 
     func cancelRecording() {
         guard isRecording else { return }
+        // Keep the latch until release so held keys cannot restart recording.
+        hotkeyWasCancelled = activeHotkeyMode != nil
         hotkeyStartedRecording = false
         _ = audioRecorder.stopRecording()
         streamingTranscriptionService?.cancel()

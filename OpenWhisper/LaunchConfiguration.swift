@@ -15,7 +15,11 @@ struct LaunchConfiguration {
     }
 
     static var current: LaunchConfiguration {
+        #if DEBUG
         let env = ProcessInfo.processInfo.environment
+        #else
+        let env: [String: String] = [:]
+        #endif
         let isTest = env["OPENWHISPER_TEST_MODE"] == "1"
         return LaunchConfiguration(
             isTestMode: isTest,
