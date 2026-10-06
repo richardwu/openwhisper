@@ -34,6 +34,7 @@ final class AppleStreamingTranscriptionTests: XCTestCase {
                 try await Task.sleep(for: .milliseconds(10))
             }
             XCTAssertEqual(manager.selectedLanguage, .english)
+            XCTAssertEqual(defaults.string(forKey: "selectedLanguage.appleStreaming"), WhisperLanguage.hausa.rawValue)
         }
 
         let vocabulary = VocabularyStore(defaults: defaults)

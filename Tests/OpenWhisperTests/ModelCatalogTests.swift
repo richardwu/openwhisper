@@ -14,7 +14,14 @@ final class ModelCatalogTests: XCTestCase {
         XCTAssertEqual(manager.selectedLanguage, .english)
         manager.selectedBackend = .whisperSmall
         XCTAssertEqual(manager.selectedLanguage, .spanish)
+        defaults.set(WhisperLanguage.english.rawValue, forKey: "selectedLanguage")
         XCTAssertEqual(ModelManager(mode: .ready, defaults: defaults).selectedLanguage, .spanish)
+        defaults.set(WhisperLanguage.spanish.rawValue, forKey: "selectedLanguage.moonshineStreamingSmall")
+        manager.selectedBackend = .moonshineStreamingSmall
+        XCTAssertEqual(manager.selectedLanguage, .english)
+        XCTAssertEqual(defaults.string(forKey: "selectedLanguage.moonshineStreamingSmall"), WhisperLanguage.spanish.rawValue)
+        manager.selectedBackend = .moonshineStreamingSmall
+        XCTAssertEqual(defaults.string(forKey: "selectedLanguage.moonshineStreamingSmall"), WhisperLanguage.spanish.rawValue)
     }
 
     @MainActor
@@ -26,6 +33,22 @@ final class ModelCatalogTests: XCTestCase {
         task.cancel()
         do {
             _ = try await delegate.download(task: task)
+            XCTFail("Expected cancellation")
+        } catch {
+            XCTAssertEqual((error as? URLError)?.code, .cancelled)
+        }
+    }
+
+    @MainActor
+    func testDownloadWithAlreadyCanceledParentReturnsImmediately() async {
+        let delegate = DownloadDelegate(onProgress: { _ in })
+        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: .main)
+        defer { session.invalidateAndCancel() }
+        let task = session.downloadTask(with: URL(string: "https://example.invalid/model.bin")!)
+        let parent = Task { @MainActor in try await delegate.download(task: task) }
+        parent.cancel()
+        do {
+            _ = try await parent.value
             XCTFail("Expected cancellation")
         } catch {
             XCTAssertEqual((error as? URLError)?.code, .cancelled)

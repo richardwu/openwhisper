@@ -47,7 +47,7 @@ struct SettingsTabView: View {
                         .foregroundStyle(.green)
                         .accessibilityIdentifier("settings.modelStatus")
                 } else if !appState.modelManager.selectedBackend.requiresModel {
-                    Label("\(appState.modelManager.selectedBackend.statusName) is unavailable on this Mac", systemImage: "exclamationmark.triangle")
+                    Label("\(appState.modelManager.selectedBackend.statusName) is currently unavailable", systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.secondary)
                 } else if appState.modelManager.isDownloading {
                     VStack(alignment: .leading) {
@@ -141,7 +141,7 @@ struct SettingsTabView: View {
             appleLanguageOptions = options
             if appState.modelManager.selectedBackend == .appleStreaming,
                !options.contains(appState.modelManager.selectedLanguage) {
-                appState.modelManager.selectedLanguage = .english
+                appState.modelManager.normalizeLanguage(.english)
             }
         }
     }

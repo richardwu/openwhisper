@@ -407,6 +407,8 @@ final class VocabularyStore {
         phraseKey: String,
         candidate: CorrectionVocabularyTerm
     ) -> Double? {
+        // A leading period must survive replacement, including sentence punctuation.
+        if phrase.hasPrefix("."), !candidate.term.hasPrefix(".") { return nil }
         if phraseKey == candidate.key {
             // Do not title-case ordinary prose (`task` should remain
             // `task`). Canonicalize acronyms, developer punctuation, internal

@@ -93,8 +93,10 @@ final class VocabularyStoreTests: XCTestCase {
     }
 
     func testDeveloperPunctuationKeepsDistinctCanonicalTerms() {
+        XCTAssertFalse(store.learn(term: "C"), "Single-letter candidates are rejected")
         XCTAssertEqual(store.correctTranscription("c++ c# .net"), "C++ C# .NET")
         XCTAssertEqual(store.correctTranscription("C++ C# .NET"), "C++ C# .NET")
+        XCTAssertEqual(store.correctTranscription("Keep .javascript. Use .net."), "Keep .javascript. Use .NET.")
         XCTAssertEqual(store.correctTranscription("The net is down."), "The net is down.")
     }
 

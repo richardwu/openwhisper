@@ -319,6 +319,7 @@ final class ModelManager {
 
     private var downloadTask: Task<Void, Never>?
     private var downloadGeneration: Int = 0
+    private var isNormalizingLanguage = false
     private let mode: Mode
     private let defaults: UserDefaults
     private var fluidAudioPreparation: (() async throws -> Void)?
@@ -331,20 +332,24 @@ final class ModelManager {
 
     var selectedBackend: TranscriptionBackend {
         didSet {
-            defaults.set(selectedLanguage.rawValue, forKey: "selectedLanguage.\(oldValue.rawValue)")
-            if let saved = defaults.string(forKey: "selectedLanguage.\(selectedBackend.rawValue)"),
-               let language = WhisperLanguage(rawValue: saved) {
-                selectedLanguage = language
+            if selectedBackend != oldValue {
+                if defaults.string(forKey: "selectedLanguage.\(oldValue.rawValue)") == nil {
+                    defaults.set(selectedLanguage.rawValue, forKey: "selectedLanguage.\(oldValue.rawValue)")
+                }
+                if let saved = defaults.string(forKey: "selectedLanguage.\(selectedBackend.rawValue)"),
+                   let language = WhisperLanguage(rawValue: saved) {
+                    normalizeLanguage(language)
+                }
+                onBackendChange?()
             }
-            if selectedBackend != oldValue { onBackendChange?() }
             defaults.set(selectedBackend.rawValue, forKey: DefaultsKey.selectedBackend)
             // Reset only languages that the selected checkpoint cannot accept.
             // Apple-supported languages are refreshed asynchronously by Settings.
             if selectedBackend.isEnglishOnly {
-                selectedLanguage = .english
+                normalizeLanguage(.english)
             } else if let supported = selectedBackend.supportedLanguageOptions,
                       !supported.contains(selectedLanguage) {
-                selectedLanguage = .english
+                normalizeLanguage(.english)
             }
             validateAppleLanguage()
         }
@@ -353,7 +358,9 @@ final class ModelManager {
     var selectedLanguage: WhisperLanguage {
         didSet {
             defaults.set(selectedLanguage.rawValue, forKey: DefaultsKey.selectedLanguage)
-            defaults.set(selectedLanguage.rawValue, forKey: "selectedLanguage.\(selectedBackend.rawValue)")
+            if !isNormalizingLanguage {
+                defaults.set(selectedLanguage.rawValue, forKey: "selectedLanguage.\(selectedBackend.rawValue)")
+            }
         }
     }
 
@@ -483,7 +490,8 @@ final class ModelManager {
             return persistedBackend
         }()
         self.selectedBackend = initialSelectedBackend
-        let storedLanguageValue = WhisperLanguage(rawValue: storedLanguage) ?? .english
+        let languagePreference = defaults.string(forKey: "selectedLanguage.\(initialSelectedBackend.rawValue)") ?? storedLanguage
+        let storedLanguageValue = WhisperLanguage(rawValue: languagePreference) ?? .english
         if initialSelectedBackend.isEnglishOnly {
             self.selectedLanguage = .english
         } else if let supported = initialSelectedBackend.supportedLanguageOptions,
@@ -508,7 +516,16 @@ final class ModelManager {
         default:
             break
         }
+        if defaults.string(forKey: "selectedLanguage.\(selectedBackend.rawValue)") == nil {
+            defaults.set(selectedLanguage.rawValue, forKey: "selectedLanguage.\(selectedBackend.rawValue)")
+        }
         validateAppleLanguage()
+    }
+
+    func normalizeLanguage(_ language: WhisperLanguage) {
+        isNormalizingLanguage = true
+        selectedLanguage = language
+        isNormalizingLanguage = false
     }
 
     private func validateAppleLanguage() {
@@ -518,7 +535,7 @@ final class ModelManager {
             Task { @MainActor [weak self] in
                 let locale = await SpeechTranscriber.supportedLocale(equivalentTo: language.appleLocale)
                 guard let self, selectedBackend == .appleStreaming, selectedLanguage == language else { return }
-                if locale == nil || language == .auto { selectedLanguage = .english }
+                if locale == nil || language == .auto { normalizeLanguage(.english) }
             }
         }
     }
@@ -777,6 +794,11 @@ final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
     @MainActor
     func download(task: URLSessionDownloadTask) async throws -> (URL, URLResponse) {
         try await withCheckedThrowingContinuation { continuation in
+            guard !Task.isCancelled, task.state != .canceling, task.state != .completed else {
+                task.cancel()
+                continuation.resume(throwing: URLError(.cancelled))
+                return
+            }
             self.continuation = continuation
             task.resume()
         }

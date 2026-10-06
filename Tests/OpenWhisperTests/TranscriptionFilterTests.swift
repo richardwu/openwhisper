@@ -38,6 +38,12 @@ final class TranscriptionFilterTests: XCTestCase {
         }
     }
 
+    func testRemovesWaterNoiseTag() {
+        XCTAssertEqual(service.filterTranscription("(water rushing)"), "")
+        XCTAssertEqual(service.filterTranscription("(water running)"), "")
+        XCTAssertEqual(service.filterTranscription("[WATER RUSHING]"), "")
+    }
+
     func testPreservesDictatedBracketsAndParentheses() {
         XCTAssertEqual(service.filterTranscription("Keep [TODO] (see attached)."), "Keep [TODO] (see attached).")
     }

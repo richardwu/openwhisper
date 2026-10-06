@@ -13,7 +13,7 @@ case "${1:-}" in
       -only-testing:OpenWhisperTranscriptionTests/NemotronStreamingTranscriptionTests
       -only-testing:OpenWhisperTranscriptionTests/FluidAudioStreamingTranscriptionTests
       -only-testing:OpenWhisperTranscriptionTests/BackgroundDictationJourneyTests
-      -only-testing:OpenWhisperTranscriptionTests/RealTranscriptionTests/testCancelAndRestartUsesFreshBatchSession
+      -only-testing:OpenWhisperTranscriptionTests/RealTranscriptionTests
     )
     # Forward model overrides to XCTest. Reuse workspace experiment assets.
     if [[ -n "${OPENWHISPER_MOONSHINE_MODEL:-}" ]]; then
@@ -62,9 +62,6 @@ xcodebuild test \
   2>&1 | tee "$log_path" | tail -40
 
 echo "==> Results at $result_path; full log at $log_path"
-while IFS= read -r test_line; do
-  if [[ "$test_line" == *" skipped "* ]]; then
-    echo "==> Some tests skipped. Check the log for unavailable model assets."
-    break
-  fi
-done < "$log_path"
+if /usr/bin/awk '/ skipped / { found=1; exit } END { exit !found }' "$log_path"; then
+  echo "==> Some tests skipped. Check the log for unavailable model assets."
+fi
