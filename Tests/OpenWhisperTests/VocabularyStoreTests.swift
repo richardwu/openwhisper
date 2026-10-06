@@ -28,6 +28,15 @@ final class VocabularyStoreTests: XCTestCase {
         XCTAssertEqual(store.correctTranscription("rest API"), "REST API")
     }
 
+    func testNativeVocabularyIsBoundedAndRequiresLearningAmbiguousTerms() {
+        let smallStore = VocabularyStore(defaults: defaults, maxTerms: 2)
+        XCTAssertEqual(smallStore.nativeTerms.count, 2)
+        XCTAssertFalse(store.nativeTerms.contains("REST"))
+        XCTAssertFalse(store.nativeTerms.contains("SAM"))
+        XCTAssertTrue(store.learn(term: "REST"))
+        XCTAssertEqual(store.nativeTerms.first, "REST")
+    }
+
     func testBundledPromptContainsOpenWhisperAndCodingTerms() throws {
         let prompt = try XCTUnwrap(store.initialPrompt)
 

@@ -116,6 +116,11 @@ final class VocabularyStore {
         candidateTerms(from: loadLearnedTerms())
     }
 
+    /// Native biasing shares correction rules and the prompt term budget.
+    var nativeTerms: [String] {
+        Array(correctionVocabulary().prefix(maxTerms).map(\.term))
+    }
+
     private func candidateTerms(from records: [LearnedTerm]) -> [String] {
         var seen = Set<String>()
         let learned = records

@@ -120,7 +120,7 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
         frameContinuation = continuation
         let language = configuredLanguage
         let family = family
-        let candidateTerms = vocabularyStore?.candidateTerms ?? []
+        let candidateTerms = vocabularyStore?.nativeTerms ?? []
         let cacheGeneration = modelCache.generation
         let cachedModel = modelCache.url == modelURL ? modelCache.model : nil
         let cancellationToken = TranscribeCpp.CancellationToken()
@@ -320,6 +320,7 @@ private extension WhisperLanguage {
             return self == .auto ? nil : rawValue
         case .moonshineStreaming, .nemotronSpeechStreaming,
              .parakeetBuffered, .multitalkerParakeetStreaming:
+            assert(self == .english, "This streaming family supports English only")
             return "en"
         }
     }

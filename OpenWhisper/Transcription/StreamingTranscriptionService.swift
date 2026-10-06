@@ -62,7 +62,11 @@ final class BackendStreamingTranscriptionService: StreamingTranscriptionService 
 
     func begin() {
         cancel()
-        guard let service = services[selectedBackend()] else { return }
+        guard let service = services[selectedBackend()] else {
+            onFailure?(NSError(domain: "OpenWhisper.Streaming", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "No streaming transcription backend is available"]))
+            return
+        }
         activeService = service
         acceptingFrames = true
         let currentGeneration = generation

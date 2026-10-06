@@ -4,6 +4,16 @@ import SwiftWhisper
 
 @MainActor
 final class StreamingTranscriptionTests: XCTestCase {
+    func testRouterReportsUnavailableBackendAtStart() {
+        let router = BackendStreamingTranscriptionService(
+            selectedBackend: { .appleStreaming }, services: [:]
+        )
+        var failure: Error?
+        router.onFailure = { failure = $0 }
+        router.begin()
+        XCTAssertTrue(failure?.localizedDescription.contains("No streaming") == true)
+    }
+
     func testRouterKeepsTheRecordingBackendUntilFinish() async throws {
         var selectedBackend = TranscriptionBackend.appleStreaming
         let apple = StreamingServiceSpy(finalText: "Apple final")

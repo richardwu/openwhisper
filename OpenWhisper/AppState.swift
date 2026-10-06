@@ -150,17 +150,9 @@ final class AppState {
 
     func cancelRecording() {
         guard isRecording else { return }
-        // Keep the latch until release so held keys cannot restart recording.
-        hotkeyWasCancelled = activeHotkeyMode != nil
-        hotkeyStartedRecording = false
-        isRecording = false
-        _ = audioRecorder.stopRecording()
-        streamingTranscriptionService?.cancel()
-        recordingSettings = nil
+        stopRecording()
         statusMessage = "Ready"
         overlayState.phase = .cancelled
-        syncCancelRecordingHotkey()
-
         // Show "Recording Cancelled" briefly, then dismiss
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
             guard self?.overlayState.phase == .cancelled else { return }
@@ -169,10 +161,22 @@ final class AppState {
         }
     }
 
+    private func stopRecording() {
+        guard isRecording else { return }
+        // Keep the latch until release so held keys cannot restart recording.
+        hotkeyWasCancelled = activeHotkeyMode != nil
+        hotkeyStartedRecording = false
+        isRecording = false
+        _ = audioRecorder.stopRecording()
+        streamingTranscriptionService?.cancel()
+        recordingSettings = nil
+        syncCancelRecordingHotkey()
+    }
+
     private func recordingFailed(_ error: Error) {
         guard isRecording else { return }
         let backend = recordingSettings?.backend ?? modelManager.selectedBackend
-        cancelRecording()
+        stopRecording()
         statusMessage = "\(backend.statusName) error: \(error.localizedDescription)"
         overlayState.phase = .hidden
         overlayController?.dismiss()

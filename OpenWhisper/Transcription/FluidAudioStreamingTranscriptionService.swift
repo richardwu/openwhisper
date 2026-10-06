@@ -106,8 +106,6 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
                     try await prepare()
                 }
                 guard currentGeneration == generation else { return }
-                try await manager.reset()
-                guard currentGeneration == generation else { return }
                 isStarting = false
                 startProcessingIfNeeded()
             } catch is CancellationError {
@@ -192,7 +190,9 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
             _ = try? await previousStartup?.value
             await previousProcessing?.value
             _ = try? await previousFinish?.value
-            try? await manager.reset()
+            if previousStartup != nil || previousProcessing != nil || previousFinish != nil {
+                try? await manager.reset()
+            }
         }
     }
 

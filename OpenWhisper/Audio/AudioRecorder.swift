@@ -106,7 +106,7 @@ enum AudioBufferConversion {
             return input
         }
         if let error { throw error }
-        guard status != .error else { throw AudioRecorderError.converterCreationFailed }
+        guard status != .error else { throw AudioRecorderError.conversionFailed }
         return output
     }
 }
@@ -275,11 +275,14 @@ final class AudioRecorder {
 enum AudioRecorderError: LocalizedError {
     case noInputDevice
     case converterCreationFailed
+    case conversionFailed
 
     var errorDescription: String? {
         switch self {
         case .noInputDevice:
             return "No audio input device found"
+        case .conversionFailed:
+            return "Failed to convert recorded audio"
         case .converterCreationFailed:
             return "Failed to create audio format converter"
         }

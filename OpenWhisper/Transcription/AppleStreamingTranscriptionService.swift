@@ -188,7 +188,7 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
             let context = AnalysisContext()
             // Apple accepts up to 100 short contextual phrases. Learned terms
             // come first because VocabularyStore ranks them by confidence.
-            context.contextualStrings[.general] = Array(vocabularyStore.candidateTerms.prefix(100))
+            context.contextualStrings[.general] = Array(vocabularyStore.nativeTerms.prefix(100))
             try await analyzer.setContext(context)
             try checkSession(generation: generation)
         }
