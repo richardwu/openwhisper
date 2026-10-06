@@ -114,10 +114,12 @@ final class TranscriptionService {
         var result = text
         // Remove <|...|> special tokens
         result = result.replacingOccurrences(of: "<\\|[^|]*\\|>", with: "", options: .regularExpression)
-        // Remove [BRACKET_TAGS] - matches [BLANK_AUDIO], [MUSIC], [inaudible], [ No sound ], etc.
-        result = result.replacingOccurrences(of: "\\[\\s*\\w[\\w\\s]*\\]", with: "", options: .regularExpression)
-        // Remove (PAREN_TAGS) - matches (music), (inaudible), (SPEAKING FOREIGN LANGUAGE), etc.
-        result = result.replacingOccurrences(of: "\\([A-Za-z][A-Za-z\\s]*\\)", with: "", options: .regularExpression)
+        // Strip known non-speech markers while preserving dictated brackets.
+        let marker = "(?:blank[_ ]audio|music|inaudible|no sound|silence|applause|laughter|noise|speaking foreign language)"
+        for (open, close) in [("\\[", "\\]"), ("\\(", "\\)")] {
+            result = result.replacingOccurrences(of: "(?i)" + open + "\\s*" + marker + "\\s*" + close,
+                                                  with: "", options: .regularExpression)
+        }
         // Remove musical note sequences
         result = result.replacingOccurrences(of: "♪+", with: "", options: .regularExpression)
         // Collapse multiple spaces and trim

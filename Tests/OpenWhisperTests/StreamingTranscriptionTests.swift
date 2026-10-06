@@ -80,6 +80,29 @@ final class StreamingTranscriptionTests: XCTestCase {
         XCTAssertEqual(service.receivedFrames, [[0.5]])
     }
 
+    func testRouterRejectsCancelledStatusAndFailureCallbacks() async throws {
+        let decoder = StreamingServiceSpy(finalText: "Final")
+        let router = BackendStreamingTranscriptionService(
+            selectedBackend: { .appleStreaming }, services: [.appleStreaming: decoder]
+        )
+        var statuses: [String] = []
+        var failures = 0
+        router.onStatusChange = { statuses.append($0) }
+        router.onFailure = { _ in failures += 1 }
+        router.begin()
+        let oldStatus = try XCTUnwrap(decoder.onStatusChange)
+        let oldFailure = try XCTUnwrap(decoder.onFailure)
+        router.cancel()
+        router.begin()
+        oldStatus("Cancelled download")
+        oldFailure(TranscriptionError.stubError)
+        decoder.onStatusChange?("Downloading Apple speech model")
+        decoder.onFailure?(TranscriptionError.stubError)
+        XCTAssertEqual(statuses, ["Downloading Apple speech model"])
+        XCTAssertEqual(failures, 1)
+        router.cancel()
+    }
+
     func testPreviewBurstKeepsTheNewestTextWithoutAProcessingBacklog() async throws {
         let service = StreamingServiceSpy(finalText: "Final raw transcript")
         let router = BackendStreamingTranscriptionService(
@@ -198,6 +221,8 @@ final class StreamingTranscriptionTests: XCTestCase {
 @MainActor
 private final class StreamingServiceSpy: StreamingTranscriptionService {
     var onPartialText: ((String) -> Void)?
+    var onStatusChange: ((String) -> Void)?
+    var onFailure: ((Error) -> Void)?
     let finalText: String
     private(set) var receivedFrames: [[Float]] = []
     private(set) var finishCount = 0

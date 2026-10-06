@@ -90,6 +90,62 @@ final class AppStateTests: XCTestCase {
         state.cancelRecording()
     }
 
+    func testBatchRecordingKeepsItsModelAfterBackendSelectionChanges() async {
+        let state = makeAppState(scenario: .recordToTranscribeSuccess)
+        await state.toggleRecording()
+        state.modelManager.selectBackend(.appleStreaming)
+        await state.toggleRecording()
+        XCTAssertEqual(state.pasteService.pastedTexts, ["Hello world"])
+    }
+
+    func testStreamingStartupFailureStopsRecordingImmediately() async {
+        let decoder = StubStreamingTranscriptionService(finalText: "Unused")
+        decoder.beginFailure = TranscriptionError.stubError
+        let state = makeStreamingAppState(decoder: decoder)
+        await state.toggleRecording()
+        XCTAssertFalse(state.isRecording)
+        XCTAssertFalse(state.isTranscribing)
+        XCTAssertTrue(state.statusMessage.contains("error:"))
+        XCTAssertTrue(state.pasteService.pastedTexts.isEmpty)
+    }
+
+    func testStreamingDownloadStatusAndAsynchronousFailureAreVisible() async {
+        let decoder = StubStreamingTranscriptionService(finalText: "Partial")
+        let state = makeStreamingAppState(decoder: decoder)
+        await state.toggleRecording()
+        decoder.onStatusChange?("Recording (downloading Apple speech model)...")
+        XCTAssertTrue(state.statusMessage.contains("downloading Apple speech model"))
+        decoder.onFailure?(TranscriptionError.stubError)
+        XCTAssertFalse(state.isRecording)
+        XCTAssertTrue(state.statusMessage.contains("error:"))
+        XCTAssertTrue(state.historyStore.entries.isEmpty)
+    }
+
+    func testMicrophoneFailureStopsWithoutPasting() async {
+        let state = makeAppState(scenario: .recordToTranscribeSuccess)
+        await state.toggleRecording()
+        state.audioRecorder.onFailure?(AudioRecorderError.converterCreationFailed)
+        XCTAssertFalse(state.isRecording)
+        XCTAssertTrue(state.statusMessage.contains("audio format converter"))
+        XCTAssertTrue(state.pasteService.pastedTexts.isEmpty)
+        XCTAssertTrue(state.historyStore.entries.isEmpty)
+    }
+
+    private func makeStreamingAppState(decoder: StubStreamingTranscriptionService) -> AppState {
+        let environment = AppEnvironment.test(scenario: .recordToTranscribeSuccess)
+        environment.modelManager.selectBackend(.appleStreaming)
+        return AppState(environment: AppEnvironment(
+            audioRecorder: environment.audioRecorder,
+            streamingTranscriptionService: decoder,
+            transcriptionService: environment.transcriptionService,
+            pasteService: environment.pasteService,
+            modelManager: environment.modelManager,
+            permissionsClient: environment.permissionsClient,
+            historyStore: environment.historyStore,
+            launchConfig: environment.launchConfig
+        ))
+    }
+
     func testHoldWithDeniedMicrophoneDoesNotStartOnRelease() async {
         let state = makeAppState(scenario: .micDenied)
         state.recordingTriggerMode = .pressAndHold
@@ -348,6 +404,9 @@ final class AppStateTests: XCTestCase {
 @MainActor
 private final class StubStreamingTranscriptionService: StreamingTranscriptionService {
     var onPartialText: ((String) -> Void)?
+    var onStatusChange: ((String) -> Void)?
+    var onFailure: ((Error) -> Void)?
+    var beginFailure: Error?
     var onFinish: (() async -> Void)?
     let finalText: String
     let shouldFail: Bool
@@ -361,6 +420,10 @@ private final class StubStreamingTranscriptionService: StreamingTranscriptionSer
     func configure(language: WhisperLanguage) {}
 
     func begin() {
+        if let beginFailure {
+            onFailure?(beginFailure)
+            return
+        }
         onPartialText?(finalText)
     }
 

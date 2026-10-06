@@ -49,6 +49,7 @@ enum TranscribeCppStreamFamily: Sendable {
 @MainActor
 final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionService {
     var onPartialText: ((String) -> Void)?
+    var onFailure: ((Error) -> Void)?
 
     private let modelURLProvider: @MainActor () -> URL?
     private let vocabularyStore: VocabularyStore?
@@ -59,6 +60,15 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
     final class ModelCache {
         var model: TranscribeCpp.Model?
         var url: URL?
+        private(set) var generation = 0
+
+        func invalidate() {
+            generation &+= 1
+            let previous = model
+            model = nil
+            url = nil
+            Task.detached { withExtendedLifetime(previous) {} }
+        }
     }
     private let modelCache: ModelCache
     private var configuredLanguage: WhisperLanguage = .english
@@ -101,8 +111,8 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
         didFail = false
 
         guard let modelURL = configuredModelURL ?? modelURLProvider() else {
-            didFail = true
-            completedResult = .failure(Self.unavailableError("\(family.displayName) model is not downloaded"))
+            let error = Self.unavailableError("\(family.displayName) model is not downloaded")
+            complete(result: .failure(error), generation: currentGeneration)
             return
         }
 
@@ -111,6 +121,7 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
         let language = configuredLanguage
         let family = family
         let candidateTerms = vocabularyStore?.candidateTerms ?? []
+        let cacheGeneration = modelCache.generation
         let cachedModel = modelCache.url == modelURL ? modelCache.model : nil
         let cancellationToken = TranscribeCpp.CancellationToken()
         nativeCancellationToken = cancellationToken
@@ -120,7 +131,7 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
                 await previousWorker?.value
                 try Task.checkCancellation()
                 let model = try cachedModel ?? TranscribeCpp.Model(path: modelURL.path)
-                await self?.cache(model, at: modelURL, generation: currentGeneration)
+                await self?.cache(model, at: modelURL, generation: currentGeneration, cacheGeneration: cacheGeneration)
                 try Task.checkCancellation()
                 let runLanguage: String? = language.transcribeCppLanguageCode(for: family)
                 // Only pass native vocabulary when the loaded model advertises
@@ -215,8 +226,8 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
         didFail = false
     }
 
-    private func cache(_ model: TranscribeCpp.Model, at url: URL, generation: Int) {
-        guard generation == self.generation else { return }
+    private func cache(_ model: TranscribeCpp.Model, at url: URL, generation: Int, cacheGeneration: Int) {
+        guard generation == self.generation, cacheGeneration == modelCache.generation else { return }
         // Keep one checkpoint across all backend instances. Release native
         // weights on a worker when another checkpoint replaces the cache.
         let previous = modelCache.model
@@ -243,6 +254,9 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
         if let completion {
             self.completion = nil
             completion.resume(with: result)
+        }
+        if case .failure(let error) = result, !(error is CancellationError) {
+            onFailure?(error)
         }
     }
 

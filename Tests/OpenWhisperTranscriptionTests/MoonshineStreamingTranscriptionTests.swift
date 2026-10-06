@@ -22,8 +22,9 @@ final class MoonshineStreamingTranscriptionTests: XCTestCase {
         }
 
         let samples = try readSamples(url: fixture)
+        let cache = TranscribeCppStreamingTranscriptionService.ModelCache()
         let service = TranscribeCppStreamingTranscriptionService(
-            modelURLProvider: { modelURL }
+            modelURLProvider: { modelURL }, modelCache: cache
         )
         var partials: [String] = []
         service.onPartialText = { text in
@@ -31,16 +32,22 @@ final class MoonshineStreamingTranscriptionTests: XCTestCase {
         }
 
         // The second recording reuses the model with a fresh native session.
-        for _ in 0..<2 {
+        for recording in 0..<3 {
             service.configure(language: .english, modelURL: modelURL)
             partials.removeAll()
             service.begin()
+            if recording == 1 { cache.invalidate() }
             for start in stride(from: 0, to: samples.count, by: 3_200) {
                 let end = min(start + 3_200, samples.count)
                 service.append(audioFrames: Array(samples[start..<end]))
             }
             let text = try await service.finish().lowercased()
 
+            if recording == 1 {
+                XCTAssertNil(cache.model, "A pinned worker must not refill an invalidated cache")
+            } else {
+                XCTAssertNotNil(cache.model)
+            }
             XCTAssertFalse(partials.isEmpty, "Moonshine should publish a partial transcript")
             XCTAssertTrue(text.contains("this is me testing"), "Unexpected final text: \(text)")
             XCTAssertTrue(text.contains("work properly"), "Unexpected final text: \(text)")

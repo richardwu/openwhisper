@@ -11,6 +11,7 @@ import SwiftWhisper
 @MainActor
 final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionService {
     var onPartialText: ((String) -> Void)?
+    var onFailure: ((Error) -> Void)?
     var onPreparationProgress: (@MainActor (Double) -> Void)?
 
     private let manager: StreamingUnifiedAsrManager
@@ -114,6 +115,7 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
             } catch {
                 guard currentGeneration == generation else { return }
                 didFail = true
+                onFailure?(error)
                 throw error
             }
         }
@@ -223,7 +225,10 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
             } catch is CancellationError {
                 return
             } catch {
-                if currentGeneration == generation { didFail = true }
+                if currentGeneration == generation {
+                    didFail = true
+                    onFailure?(error)
+                }
             }
         }
     }

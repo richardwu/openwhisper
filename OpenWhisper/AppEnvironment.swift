@@ -53,6 +53,9 @@ struct AppEnvironment {
             .parakeetUnified: parakeetService,
         ]
         let nativeModelCache = TranscribeCppStreamingTranscriptionService.ModelCache()
+        modelManager.onBackendChange = {
+            nativeModelCache.invalidate()
+        }
         for backend in TranscriptionBackend.allCases {
             guard let family = backend.transcribeCppStreamFamily else { continue }
             streamingServices[backend] = TranscribeCppStreamingTranscriptionService(

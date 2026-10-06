@@ -21,6 +21,13 @@ final class VocabularyStoreTests: XCTestCase {
         super.tearDown()
     }
 
+    func testBundledAcronymsDoNotRewriteOrdinaryWordsOrNames() {
+        let text = "Ask Sam about the rest of the day, til Tam and Som meet Eta."
+        XCTAssertEqual(store.correctTranscription(text), text)
+        XCTAssertTrue(store.learn(term: "REST"))
+        XCTAssertEqual(store.correctTranscription("rest API"), "REST API")
+    }
+
     func testBundledPromptContainsOpenWhisperAndCodingTerms() throws {
         let prompt = try XCTUnwrap(store.initialPrompt)
 

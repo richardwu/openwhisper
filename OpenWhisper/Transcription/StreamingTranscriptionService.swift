@@ -6,6 +6,8 @@ import SwiftWhisper
 @MainActor
 protocol StreamingTranscriptionService: AnyObject {
     var onPartialText: ((String) -> Void)? { get set }
+    var onStatusChange: ((String) -> Void)? { get set }
+    var onFailure: ((Error) -> Void)? { get set }
     func configure(language: WhisperLanguage)
     func configure(language: WhisperLanguage, modelURL: URL?)
     func begin()
@@ -15,6 +17,8 @@ protocol StreamingTranscriptionService: AnyObject {
 }
 
 extension StreamingTranscriptionService {
+    var onStatusChange: ((String) -> Void)? { get { nil } set {} }
+    var onFailure: ((Error) -> Void)? { get { nil } set {} }
     func configure(language: WhisperLanguage, modelURL: URL?) {
         configure(language: language)
     }
@@ -26,6 +30,8 @@ extension StreamingTranscriptionService {
 @MainActor
 final class BackendStreamingTranscriptionService: StreamingTranscriptionService {
     var onPartialText: ((String) -> Void)?
+    var onStatusChange: ((String) -> Void)?
+    var onFailure: ((Error) -> Void)?
 
     private let services: [TranscriptionBackend: any StreamingTranscriptionService]
     private let selectedBackend: () -> TranscriptionBackend
@@ -66,6 +72,14 @@ final class BackendStreamingTranscriptionService: StreamingTranscriptionService 
         service.onPartialText = { [weak self] text in
             guard let self, currentGeneration == self.generation else { return }
             self.previewContinuation?.yield(text)
+        }
+        service.onStatusChange = { [weak self] status in
+            guard let self, currentGeneration == self.generation else { return }
+            self.onStatusChange?(status)
+        }
+        service.onFailure = { [weak self] error in
+            guard let self, currentGeneration == self.generation else { return }
+            self.onFailure?(error)
         }
         previewWorker = Task.detached(priority: .userInitiated) { [weak self] in
             var lastRaw = ""

@@ -9,6 +9,8 @@ import SwiftWhisper
 @MainActor
 final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
     var onPartialText: ((String) -> Void)?
+    var onStatusChange: ((String) -> Void)?
+    var onFailure: ((Error) -> Void)?
 
     private var language: WhisperLanguage
     private let vocabularyStore: VocabularyStore?
@@ -64,7 +66,10 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
             do {
                 try await self.prepare(generation: currentGeneration)
             } catch {
-                if currentGeneration == generation { didFail = true }
+                if currentGeneration == generation, !(error is CancellationError) {
+                    didFail = true
+                    onFailure?(error)
+                }
                 throw error
             }
         }
@@ -93,7 +98,7 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
             if let audioConverter {
                 do {
                     while true {
-                        let tail = try Self.convertedBuffer(input: nil, using: audioConverter)
+                        let tail = try AudioBufferConversion.convert(input: nil, using: audioConverter)
                         guard tail.frameLength > 0 else { break }
                         yield(tail, into: continuation)
                     }
@@ -161,7 +166,10 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
 
         if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
             try checkSession(generation: generation)
+            onStatusChange?("Recording (downloading Apple speech model)...")
             try await request.downloadAndInstall()
+            try checkSession(generation: generation)
+            onStatusChange?("Recording...")
         }
         try checkSession(generation: generation)
 
@@ -205,7 +213,10 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
                     self?.consume(result)
                 }
             } catch {
-                if self?.generation == generation { self?.didFail = true }
+                if self?.generation == generation, !(error is CancellationError) {
+                    self?.didFail = true
+                    self?.onFailure?(error)
+                }
             }
         }
 
@@ -214,6 +225,7 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
             yield(frames, into: continuation, format: format)
         }
         pendingFrames.removeAll(keepingCapacity: false)
+        try checkSession(generation: generation)
         try await analyzer.start(inputSequence: stream)
         try checkSession(generation: generation)
     }
@@ -228,16 +240,18 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
                                            frameCapacity: AVAudioFrameCount(frames.count)),
               let destination = input.floatChannelData?[0] else {
             didFail = true
+            onFailure?(AudioRecorderError.converterCreationFailed)
             return
         }
         input.frameLength = AVAudioFrameCount(frames.count)
         frames.withUnsafeBufferPointer { destination.update(from: $0.baseAddress!, count: frames.count) }
         do {
-            let buffer = try Self.convertedBuffer(input: input, using: converter)
+            let buffer = try AudioBufferConversion.convert(input: input, using: converter)
             yield(buffer, into: continuation)
         } catch {
             // Audio cannot be dropped safely. Fail the recording explicitly.
             didFail = true
+            onFailure?(error)
         }
     }
 
@@ -246,33 +260,6 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         let start = CMTime(value: frameOffset, timescale: CMTimeScale(buffer.format.sampleRate))
         continuation.yield(AnalyzerInput(buffer: buffer, bufferStartTime: start))
         frameOffset += Int64(buffer.frameLength)
-    }
-
-    /// A nil input drains the resampler's buffered tail at end of recording.
-    static func convertedBuffer(input: AVAudioPCMBuffer?, using converter: AVAudioConverter) throws -> AVAudioPCMBuffer {
-        let capacity = AVAudioFrameCount(ceil(Double(input?.frameLength ?? 0)
-            * converter.outputFormat.sampleRate / converter.inputFormat.sampleRate)) + 1024
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: converter.outputFormat, frameCapacity: capacity) else {
-            throw AudioRecorderError.converterCreationFailed
-        }
-        var consumed = false
-        var error: NSError?
-        let status = converter.convert(to: buffer, error: &error) { _, status in
-            guard let input else {
-                status.pointee = .endOfStream
-                return nil
-            }
-            guard !consumed else {
-                status.pointee = .noDataNow
-                return nil
-            }
-            consumed = true
-            status.pointee = .haveData
-            return input
-        }
-        if let error { throw error }
-        guard status != .error else { throw AudioRecorderError.converterCreationFailed }
-        return buffer
     }
 
     private func consume(_ result: SpeechTranscriber.Result) {

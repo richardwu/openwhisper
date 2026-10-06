@@ -108,14 +108,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .build/models/ggml-base.bin
-          key: whisper-model-base-v1
+          key: whisper-model-base-60ed5bc3dd14eea8
 
       - name: Download Whisper model
-        if: steps.cache-model.outputs.cache-hit != 'true'
         run: |
           mkdir -p .build/models
-          curl -L -o .build/models/ggml-base.bin \
-            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
+          if [ ! -f .build/models/ggml-base.bin ]; then
+            curl --fail --location -o .build/models/ggml-base.bin \
+              "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.bin"
+          fi
+          echo "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe  .build/models/ggml-base.bin" | shasum -a 256 -c -
 
       - name: Generate Xcode project
         run: xcodegen generate

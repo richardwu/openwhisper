@@ -1,5 +1,6 @@
 import SwiftUI
 import KeyboardShortcuts
+import SwiftWhisper
 
 enum RecordingTriggerMode: String, CaseIterable {
     case toggle
@@ -45,7 +46,7 @@ final class AppState {
 
     private let launchConfig: LaunchConfiguration
     var isTestMode: Bool { launchConfig.isTestMode }
-    private var recordingBackend: TranscriptionBackend?
+    private var recordingSettings: (backend: TranscriptionBackend, modelURL: URL?, language: WhisperLanguage)?
 
     init(environment: AppEnvironment) {
         let defaults = environment.launchConfig.defaultsSuiteName.flatMap(UserDefaults.init(suiteName:)) ?? .standard
@@ -74,6 +75,17 @@ final class AppState {
         streamingTranscriptionService?.onPartialText = { [weak self] text in
             guard let self, self.isRecording, !text.isEmpty else { return }
             self.statusMessage = "Recording: \(String(text.prefix(50)))\(text.count > 50 ? "..." : "")"
+        }
+
+        streamingTranscriptionService?.onStatusChange = { [weak self] status in
+            guard let self, self.isRecording else { return }
+            self.statusMessage = status
+        }
+        streamingTranscriptionService?.onFailure = { [weak self] error in
+            self?.recordingFailed(error)
+        }
+        audioRecorder.onFailure = { [weak self] error in
+            self?.recordingFailed(error)
         }
 
         if !launchConfig.disableHotkeys {
@@ -141,10 +153,10 @@ final class AppState {
         // Keep the latch until release so held keys cannot restart recording.
         hotkeyWasCancelled = activeHotkeyMode != nil
         hotkeyStartedRecording = false
+        isRecording = false
         _ = audioRecorder.stopRecording()
         streamingTranscriptionService?.cancel()
-        recordingBackend = nil
-        isRecording = false
+        recordingSettings = nil
         statusMessage = "Ready"
         overlayState.phase = .cancelled
         syncCancelRecordingHotkey()
@@ -155,6 +167,15 @@ final class AppState {
             self?.overlayState.phase = .hidden
             self?.overlayController?.dismiss()
         }
+    }
+
+    private func recordingFailed(_ error: Error) {
+        guard isRecording else { return }
+        let backend = recordingSettings?.backend ?? modelManager.selectedBackend
+        cancelRecording()
+        statusMessage = "\(backend.statusName) error: \(error.localizedDescription)"
+        overlayState.phase = .hidden
+        overlayController?.dismiss()
     }
 
     private func startRecording() {
@@ -187,8 +208,13 @@ final class AppState {
         }
 
         do {
-            try audioRecorder.startRecording()
-            recordingBackend = modelManager.selectedBackend
+            try audioRecorder.startRecording(retainSamples: !modelManager.selectedBackend.isStreamingBackend)
+            recordingSettings = (modelManager.selectedBackend, modelManager.modelFileURL, modelManager.selectedLanguage)
+            isRecording = true
+            statusMessage = "Recording..."
+            overlayState.phase = .recording
+            overlayController?.show()
+            syncCancelRecordingHotkey()
             if modelManager.selectedBackend.isStreamingBackend {
                 streamingTranscriptionService?.configure(
                     language: modelManager.selectedLanguage,
@@ -196,11 +222,6 @@ final class AppState {
                 )
                 streamingTranscriptionService?.begin()
             }
-            isRecording = true
-            statusMessage = "Recording..."
-            overlayState.phase = .recording
-            overlayController?.show()
-            syncCancelRecordingHotkey()
         } catch {
             statusMessage = "Mic error: \(error.localizedDescription)"
         }
@@ -222,17 +243,28 @@ final class AppState {
     }
 
     private func stopRecordingAndTranscribe() async {
-        let backend = recordingBackend ?? modelManager.selectedBackend
+        let settings = recordingSettings
+        let backend = settings?.backend ?? modelManager.selectedBackend
         let samples = audioRecorder.stopRecording()
+        // A synchronous tail callback can fail and cancel this recording.
+        guard isRecording else { return }
         isRecording = false
         syncCancelRecordingHotkey()
 
+        if let error = audioRecorder.lastError {
+            streamingTranscriptionService?.cancel()
+            recordingSettings = nil
+            statusMessage = "Recording error: \(error.localizedDescription)"
+            overlayState.phase = .hidden
+            overlayController?.dismiss()
+            return
+        }
         isTranscribing = true
         statusMessage = "Processing..."
         overlayState.phase = .transcribing
         defer {
             isTranscribing = false
-            recordingBackend = nil
+            recordingSettings = nil
         }
 
         var streamedText: String?
@@ -248,20 +280,20 @@ final class AppState {
             }
         }
 
-        guard !samples.isEmpty else {
+        guard backend.isStreamingBackend || !samples.isEmpty else {
             statusMessage = "No audio captured"
             overlayState.phase = .hidden
             overlayController?.dismiss()
             return
         }
 
-        let modelURL = modelManager.modelFileURL
+        let modelURL = settings?.modelURL
         // Streaming backends own their loaded model inside the streaming
         // service. Their `modelFileURL` is intentionally nil (Apple and
         // FluidAudio) even after a successful finish; only batch Whisper and
         // GGUF backends require a file URL here.
         if !backend.isStreamingBackend &&
-           (modelURL == nil || !modelManager.isModelReady) {
+           modelURL == nil {
             statusMessage = "Model not available"
             overlayState.phase = .hidden
             overlayController?.dismiss()
@@ -283,7 +315,7 @@ final class AppState {
                 text = try await transcriptionService.transcribe(
                     audioFrames: samples,
                     modelURL: modelURL,
-                    language: modelManager.selectedLanguage
+                    language: settings?.language ?? modelManager.selectedLanguage
                 )
             }
 

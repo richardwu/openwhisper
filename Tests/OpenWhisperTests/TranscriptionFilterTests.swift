@@ -26,6 +26,10 @@ final class TranscriptionFilterTests: XCTestCase {
         XCTAssertEqual(result, "Hello")
     }
 
+    func testPreservesDictatedBracketsAndParentheses() {
+        XCTAssertEqual(service.filterTranscription("Keep [TODO] (see attached)."), "Keep [TODO] (see attached).")
+    }
+
     func testRemovesMusicalNotes() {
         let result = service.filterTranscription("♪♪♪ Hello ♪")
         XCTAssertEqual(result, "Hello")

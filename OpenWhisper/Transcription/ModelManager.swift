@@ -315,6 +315,8 @@ final class ModelManager {
     var downloadProgress: Double = 0
     var errorMessage: String?
 
+    @ObservationIgnored var onBackendChange: (() -> Void)?
+
     private var downloadTask: Task<Void, Never>?
     private var downloadGeneration: Int = 0
     private let mode: Mode
@@ -329,6 +331,7 @@ final class ModelManager {
 
     var selectedBackend: TranscriptionBackend {
         didSet {
+            if selectedBackend != oldValue { onBackendChange?() }
             defaults.set(selectedBackend.rawValue, forKey: DefaultsKey.selectedBackend)
             // Apple Speech and the bundled streaming models currently expose
             // only English in the settings picker. Nemotron 3.5 exposes a

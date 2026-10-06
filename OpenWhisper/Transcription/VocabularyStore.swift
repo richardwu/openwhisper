@@ -326,6 +326,10 @@ final class VocabularyStore {
         let hasTechnicalSpelling: Bool
     }
 
+    // ponytail: known ambiguous acronyms require learning; add contextual
+    // matching if users need them corrected automatically.
+    private static let ambiguousBundledKeys: Set<String> = ["rest", "sam", "tam", "som", "til", "eta", "ram"]
+
     private func correctionVocabulary() -> [CorrectionVocabularyTerm] {
         let records = loadLearnedTerms()
         let learnedKeys = Set(records.map { Self.comparisonKey($0.term) })
@@ -334,6 +338,7 @@ final class VocabularyStore {
             let key = Self.correctionKey(term)
             guard !key.isEmpty, seen.insert(key).inserted else { return nil }
             let learned = learnedKeys.contains(Self.comparisonKey(term))
+            guard learned || !Self.ambiguousBundledKeys.contains(key) else { return nil }
             let hasTechnicalSpelling = term.dropFirst().contains(where: { $0.isUppercase }) ||
                 term.rangeOfCharacter(from: .decimalDigits) != nil ||
                 term.contains(where: { ".#+_-/&".contains($0) })
