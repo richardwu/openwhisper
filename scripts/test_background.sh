@@ -62,6 +62,9 @@ xcodebuild test \
   2>&1 | tee "$log_path" | tail -40
 
 echo "==> Results at $result_path; full log at $log_path"
-if rg -q ' skipped ' "$log_path"; then
-  echo "==> Some tests skipped. Check the log for unavailable model assets."
-fi
+while IFS= read -r test_line; do
+  if [[ "$test_line" == *" skipped "* ]]; then
+    echo "==> Some tests skipped. Check the log for unavailable model assets."
+    break
+  fi
+done < "$log_path"

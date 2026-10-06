@@ -4,6 +4,35 @@ import SwiftWhisper
 
 final class ModelCatalogTests: XCTestCase {
     @MainActor
+    func testLanguageChoiceReturnsAfterUsingEnglishOnlyBackend() {
+        let suiteName = "com.openwhisper.backend-language.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let manager = ModelManager(mode: .ready, defaults: defaults)
+        manager.selectedLanguage = .spanish
+        manager.selectedBackend = .parakeetUnified
+        XCTAssertEqual(manager.selectedLanguage, .english)
+        manager.selectedBackend = .whisperSmall
+        XCTAssertEqual(manager.selectedLanguage, .spanish)
+        XCTAssertEqual(ModelManager(mode: .ready, defaults: defaults).selectedLanguage, .spanish)
+    }
+
+    @MainActor
+    func testDownloadCanceledBeforeResumeCompletesWithoutInvalidatingSession() async {
+        let delegate = DownloadDelegate(onProgress: { _ in })
+        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: .main)
+        defer { session.invalidateAndCancel() }
+        let task = session.downloadTask(with: URL(string: "https://example.invalid/model.bin")!)
+        task.cancel()
+        do {
+            _ = try await delegate.download(task: task)
+            XCTFail("Expected cancellation")
+        } catch {
+            XCTAssertEqual((error as? URLError)?.code, .cancelled)
+        }
+    }
+
+    @MainActor
     func testMissingModelFixtureIsUnavailableForEveryBackend() {
         let suiteName = "com.openwhisper.missing-backends.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

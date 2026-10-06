@@ -331,6 +331,11 @@ final class ModelManager {
 
     var selectedBackend: TranscriptionBackend {
         didSet {
+            defaults.set(selectedLanguage.rawValue, forKey: "selectedLanguage.\(oldValue.rawValue)")
+            if let saved = defaults.string(forKey: "selectedLanguage.\(selectedBackend.rawValue)"),
+               let language = WhisperLanguage(rawValue: saved) {
+                selectedLanguage = language
+            }
             if selectedBackend != oldValue { onBackendChange?() }
             defaults.set(selectedBackend.rawValue, forKey: DefaultsKey.selectedBackend)
             // Reset only languages that the selected checkpoint cannot accept.
@@ -348,6 +353,7 @@ final class ModelManager {
     var selectedLanguage: WhisperLanguage {
         didSet {
             defaults.set(selectedLanguage.rawValue, forKey: DefaultsKey.selectedLanguage)
+            defaults.set(selectedLanguage.rawValue, forKey: "selectedLanguage.\(selectedBackend.rawValue)")
         }
     }
 
@@ -629,10 +635,11 @@ final class ModelManager {
             let session = URLSession(configuration: config, delegate: delegate, delegateQueue: OperationQueue.main)
             defer { session.invalidateAndCancel() }
 
+            let task = session.downloadTask(with: downloadURL)
             let (tempURL, response) = try await withTaskCancellationHandler {
-                try await delegate.download(session: session, from: downloadURL)
+                try await delegate.download(task: task)
             } onCancel: {
-                session.invalidateAndCancel()
+                task.cancel()
             }
 
             defer { try? FileManager.default.removeItem(at: tempURL) }
@@ -759,7 +766,7 @@ final class ModelManager {
     }
 }
 
-private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
+final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
     let onProgress: (Double) -> Void
     private var continuation: CheckedContinuation<(URL, URLResponse), Error>?
 
@@ -767,10 +774,11 @@ private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
         self.onProgress = onProgress
     }
 
-    func download(session: URLSession, from url: URL) async throws -> (URL, URLResponse) {
+    @MainActor
+    func download(task: URLSessionDownloadTask) async throws -> (URL, URLResponse) {
         try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
-            session.downloadTask(with: url).resume()
+            task.resume()
         }
     }
 

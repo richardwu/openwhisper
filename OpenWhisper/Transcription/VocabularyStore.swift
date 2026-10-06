@@ -351,7 +351,7 @@ final class VocabularyStore {
             // periods in abbreviations such as e.g., i.e., and etc.
             guard !term.hasSuffix(".") else { return nil }
             let key = Self.correctionKey(term)
-            guard !key.isEmpty, seen.insert(key).inserted else { return nil }
+            guard !key.isEmpty, seen.insert(Self.comparisonKey(term)).inserted else { return nil }
             let learned = learnedKeys.contains(Self.comparisonKey(term))
             guard learned || !Self.ambiguousBundledKeys.contains(key) else { return nil }
             let hasTechnicalSpelling = term.dropFirst().contains(where: { $0.isUppercase }) ||
@@ -370,7 +370,7 @@ final class VocabularyStore {
     }
 
     private static let correctionTokenRegex = try! NSRegularExpression(
-        pattern: "[\\p{L}\\p{N}][\\p{L}\\p{N}.+#&/_-]*"
+        pattern: "\\.?[\\p{L}\\p{N}][\\p{L}\\p{N}.+#&/_-]*"
     )
 
     private static func correctionTokens(in text: String) -> [CorrectionToken] {
@@ -424,6 +424,8 @@ final class VocabularyStore {
             let inputHasPunctuation = phrase.contains {
                 !$0.isLetter && !$0.isNumber && !$0.isWhitespace
             }
+            if inputHasPunctuation && candidate.key.count < 4,
+               comparisonKey(phrase) != comparisonKey(candidate.term) { return nil }
             if hasPunctuation && !inputHasPunctuation && !candidate.learned && candidate.key.count < 4 {
                 return nil
             }

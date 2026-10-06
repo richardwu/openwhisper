@@ -46,6 +46,9 @@ struct SettingsTabView: View {
                     Label("\(appState.modelManager.selectedBackend.statusName), model ready", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                         .accessibilityIdentifier("settings.modelStatus")
+                } else if !appState.modelManager.selectedBackend.requiresModel {
+                    Label("\(appState.modelManager.selectedBackend.statusName) is unavailable on this Mac", systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.secondary)
                 } else if appState.modelManager.isDownloading {
                     VStack(alignment: .leading) {
                         Text("Downloading model...")

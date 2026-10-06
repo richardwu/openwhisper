@@ -92,6 +92,12 @@ final class VocabularyStoreTests: XCTestCase {
         XCTAssertLessThanOrEqual(prompt.split(separator: ",").count, 2)
     }
 
+    func testDeveloperPunctuationKeepsDistinctCanonicalTerms() {
+        XCTAssertEqual(store.correctTranscription("c++ c# .net"), "C++ C# .NET")
+        XCTAssertEqual(store.correctTranscription("C++ C# .NET"), "C++ C# .NET")
+        XCTAssertEqual(store.correctTranscription("The net is down."), "The net is down.")
+    }
+
     func testLocalCorrectionRepairsPhoneticAcronym() {
         XCTAssertEqual(store.correctTranscription("I trade on Nyzi."), "I trade on NYSE.")
         XCTAssertEqual(store.correctTranscription("I trade on Nisy."), "I trade on NYSE.")
