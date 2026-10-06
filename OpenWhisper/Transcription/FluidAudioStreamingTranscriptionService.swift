@@ -26,6 +26,7 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
     private var releaseWhenIdle = false
     private var isStarting = false
     private var acceptingFrames = false
+    private var isFinishing = false
     private var didFail = false
     private var generation = 0
 
@@ -81,8 +82,7 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
     /// Keep an active decoder pinned, then release deselected Core ML weights.
     func setSelected(_ selected: Bool) {
         releaseWhenIdle = !selected
-        guard !selected, !acceptingFrames, !isStarting, startupTask == nil,
-              processingTask == nil, finishingTask == nil else { return }
+        guard !selected, !acceptingFrames, !isStarting, !isFinishing else { return }
         preparationTask?.cancel()
         cancel()
     }
@@ -140,6 +140,10 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
     func finish() async throws -> String {
         acceptingFrames = false
         let currentGeneration = generation
+        isFinishing = true
+        defer {
+            if currentGeneration == generation { isFinishing = false }
+        }
         do {
             try await startupTask?.value
             guard currentGeneration == generation else { throw CancellationError() }
@@ -202,6 +206,7 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
         didFail = false
         isStarting = false
         acceptingFrames = false
+        isFinishing = false
 
         let manager = self.manager
         cleanupTask = Task {

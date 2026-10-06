@@ -134,7 +134,7 @@ enum TranscribeCppModel: String, CaseIterable {
         case .voxtralMiniRealtime:
             return "Voxtral Mini 4B Realtime (2.8 GB, streaming)"
         case .multitalkerParakeetStreaming:
-            return "Multitalker Parakeet 0.6B (617 MB, streaming)"
+            return "Multitalker Parakeet 0.6B (617 MB, streaming, no speaker labels)"
         }
     }
 }

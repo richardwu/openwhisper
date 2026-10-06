@@ -112,6 +112,23 @@ final class ModelCatalogTests: XCTestCase {
     }
 
     @MainActor
+    func testLiveEnvironmentReleasesModelManager() {
+        let suiteName = "com.openwhisper.environment-release.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        weak var manager: ModelManager?
+        autoreleasepool {
+            let config = LaunchConfiguration(
+                isTestMode: true, testScenario: nil, defaultsSuiteName: suiteName,
+                disableSparkle: true, disableHotkeys: true, modelPath: "/missing/model.bin"
+            )
+            let environment = AppEnvironment.live(config)
+            manager = environment.modelManager
+        }
+        XCTAssertNil(manager, "Backend-change callback must not retain its owner")
+    }
+
+    @MainActor
     func testCanceledChecksumVerificationStopsBackgroundWorker() async throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: file) }
