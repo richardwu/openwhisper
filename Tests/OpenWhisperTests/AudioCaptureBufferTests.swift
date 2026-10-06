@@ -27,13 +27,23 @@ final class AudioCaptureBufferTests: XCTestCase {
         XCTAssertTrue(try capture.convert(input).isEmpty)
     }
 
-    func testStopDrainsQueuedFramesAndRejectsLateAudio() {
+    func testBatchCaptureRetainsSamplesWithoutQueueingDelivery() {
         let capture = AudioCaptureBuffer()
+        XCTAssertTrue(capture.append([1, 2]))
+        XCTAssertTrue(capture.drain().isEmpty)
+        XCTAssertTrue(capture.append([3, 4]))
+        let result = capture.finish()
+        XCTAssertEqual(result.samples, [1, 2, 3, 4])
+        XCTAssertTrue(result.pending.isEmpty)
+    }
+
+    func testStopDrainsQueuedFramesAndRejectsLateAudio() {
+        let capture = AudioCaptureBuffer(retainSamples: false)
         XCTAssertTrue(capture.append([1, 2]))
         XCTAssertEqual(capture.drain(), [[1, 2]])
         XCTAssertTrue(capture.append([3, 4]))
         let result = capture.finish()
-        XCTAssertEqual(result.samples, [1, 2, 3, 4])
+        XCTAssertTrue(result.samples.isEmpty)
         XCTAssertEqual(result.pending, [[3, 4]])
         XCTAssertTrue(capture.drain().isEmpty)
         XCTAssertFalse(capture.append([5]))

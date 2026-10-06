@@ -251,7 +251,7 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
                                            frameCapacity: AVAudioFrameCount(frames.count)),
               let destination = input.floatChannelData?[0] else {
             didFail = true
-            onFailure?(AudioRecorderError.converterCreationFailed)
+            onFailure?(AudioRecorderError.bufferAllocationFailed)
             return
         }
         input.frameLength = AVAudioFrameCount(frames.count)
@@ -296,10 +296,13 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
     }
 }
 
-private extension WhisperLanguage {
+extension WhisperLanguage {
     var appleLocale: Locale {
         if self == .auto {
             return Locale.current
+        }
+        if self == .norwegian {
+            return Locale(identifier: "nb-NO")
         }
         if rawValue == "iw" {
             return Locale(identifier: "he")

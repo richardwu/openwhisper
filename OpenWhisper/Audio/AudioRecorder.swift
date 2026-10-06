@@ -13,8 +13,11 @@ final class AudioCaptureBuffer: Sendable {
 
         mutating func append(_ frames: [Float]) {
             guard !frames.isEmpty else { return }
-            if retainSamples { samples.append(contentsOf: frames) }
-            pending.append(frames)
+            if retainSamples {
+                samples.append(contentsOf: frames)
+            } else {
+                pending.append(frames)
+            }
         }
     }
     private let state: OSAllocatedUnfairLock<State>
@@ -88,7 +91,7 @@ enum AudioBufferConversion {
         let capacity = AVAudioFrameCount(ceil(Double(input?.frameLength ?? 0)
             * converter.outputFormat.sampleRate / converter.inputFormat.sampleRate)) + 1024
         guard let output = AVAudioPCMBuffer(pcmFormat: converter.outputFormat, frameCapacity: capacity) else {
-            throw AudioRecorderError.converterCreationFailed
+            throw AudioRecorderError.bufferAllocationFailed
         }
         var consumed = false
         var error: NSError?
@@ -196,7 +199,7 @@ final class AudioRecorder {
         let capture = AudioCaptureBuffer(retainSamples: retainSamples, converter: converter)
         captureBuffer = capture
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-            self?.convert(buffer: buffer, meter: meter, capture: capture)
+            self?.convert(buffer: buffer, meter: meter, capture: capture, streamFrames: !retainSamples)
         }
 
         engine.prepare()
@@ -241,7 +244,8 @@ final class AudioRecorder {
     private nonisolated func convert(
         buffer: AVAudioPCMBuffer,
         meter: AudioLevelMeter,
-        capture: AudioCaptureBuffer
+        capture: AudioCaptureBuffer,
+        streamFrames: Bool
     ) {
         let floatArray: [Float]
         do {
@@ -265,9 +269,11 @@ final class AudioRecorder {
             meter.update(rms)
         }
 
-        Task { @MainActor [weak self] in
-            guard let self, self.captureBuffer === capture else { return }
-            for frames in capture.drain() { self.onAudioFrames?(frames) }
+        if streamFrames {
+            Task { @MainActor [weak self] in
+                guard let self, self.captureBuffer === capture else { return }
+                for frames in capture.drain() { self.onAudioFrames?(frames) }
+            }
         }
     }
 }
@@ -276,11 +282,14 @@ enum AudioRecorderError: LocalizedError {
     case noInputDevice
     case converterCreationFailed
     case conversionFailed
+    case bufferAllocationFailed
 
     var errorDescription: String? {
         switch self {
         case .noInputDevice:
             return "No audio input device found"
+        case .bufferAllocationFailed:
+            return "Failed to allocate an audio buffer"
         case .conversionFailed:
             return "Failed to convert recorded audio"
         case .converterCreationFailed:

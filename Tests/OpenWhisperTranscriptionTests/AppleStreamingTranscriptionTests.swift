@@ -1,5 +1,6 @@
 import AVFoundation
 import Speech
+import SwiftWhisper
 import XCTest
 @testable import OpenWhisper
 
@@ -22,6 +23,19 @@ final class AppleStreamingTranscriptionTests: XCTestCase {
         let suiteName = "com.openwhisper.test.apple-streaming.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
+        // Launch validation handles unsupported persisted locales without opening Settings.
+        defaults.set(TranscriptionBackend.appleStreaming.rawValue, forKey: "selectedBackend")
+        defaults.set(WhisperLanguage.hausa.rawValue, forKey: "selectedLanguage")
+        defaults.set(true, forKey: "didMigrateToMultilingual")
+        let manager = ModelManager(mode: .live, defaults: defaults)
+        let hausaLocale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: "ha"))
+        if hausaLocale == nil {
+            for _ in 0..<100 where manager.selectedLanguage != .english {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            XCTAssertEqual(manager.selectedLanguage, .english)
+        }
+
         let vocabulary = VocabularyStore(defaults: defaults)
         let decoder = AppleStreamingTranscriptionService(vocabularyStore: vocabulary)
         let service = BackendStreamingTranscriptionService(

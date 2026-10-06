@@ -215,7 +215,7 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
                     // growing queue once for every microphone callback.
                     let frames = pendingFrames.flatMap { $0 }
                     pendingFrames.removeAll(keepingCapacity: true)
-                    guard let buffer = makeAudioBuffer(frames) else { continue }
+                    guard let buffer = makeAudioBuffer(frames) else { throw AudioRecorderError.bufferAllocationFailed }
                     try await manager.appendAudio(buffer)
                     try await manager.processBufferedAudio()
                     _ = await manager.consumeTokenTimings()

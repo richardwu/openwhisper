@@ -292,7 +292,7 @@ final class ModelManager {
         case live
         case ready
         case downloading(progress: Double)
-        case missing
+        case missing // Fixture: the selected backend is unavailable.
         case failed(message: String)
         case fixedPath(URL)
     }
@@ -341,6 +341,7 @@ final class ModelManager {
                       !supported.contains(selectedLanguage) {
                 selectedLanguage = .english
             }
+            validateAppleLanguage()
         }
     }
 
@@ -355,9 +356,9 @@ final class ModelManager {
             switch mode {
             case .live:
                 return Self.appleStreamingIsAvailable
-            case .ready, .fixedPath, .missing:
+            case .ready, .fixedPath:
                 return true
-            case .downloading, .failed:
+            case .downloading, .missing, .failed:
                 return false
             }
         }
@@ -500,6 +501,19 @@ final class ModelManager {
             }
         default:
             break
+        }
+        validateAppleLanguage()
+    }
+
+    private func validateAppleLanguage() {
+        guard case .live = mode, selectedBackend == .appleStreaming else { return }
+        if #available(macOS 26.0, *) {
+            let language = selectedLanguage
+            Task { @MainActor [weak self] in
+                let locale = await SpeechTranscriber.supportedLocale(equivalentTo: language.appleLocale)
+                guard let self, selectedBackend == .appleStreaming, selectedLanguage == language else { return }
+                if locale == nil || language == .auto { selectedLanguage = .english }
+            }
         }
     }
 

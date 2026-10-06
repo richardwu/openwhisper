@@ -123,6 +123,7 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
         let candidateTerms = vocabularyStore?.nativeTerms ?? []
         let cacheGeneration = modelCache.generation
         let cachedModel = modelCache.url == modelURL ? modelCache.model : nil
+        let cache = modelCache
         let cancellationToken = TranscribeCpp.CancellationToken()
         nativeCancellationToken = cancellationToken
 
@@ -130,8 +131,16 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
             do {
                 await previousWorker?.value
                 try Task.checkCancellation()
-                let model = try cachedModel ?? TranscribeCpp.Model(path: modelURL.path)
-                await self?.cache(model, at: modelURL, generation: currentGeneration, cacheGeneration: cacheGeneration)
+                var reusableModel = cachedModel
+                if reusableModel == nil {
+                    // A canceled predecessor may have finished loading while we waited.
+                    reusableModel = await MainActor.run {
+                        cache.generation == cacheGeneration && cache.url == modelURL ? cache.model : nil
+                    }
+                }
+                try Task.checkCancellation()
+                let model = try reusableModel ?? TranscribeCpp.Model(path: modelURL.path)
+                await self?.cache(model, at: modelURL, cacheGeneration: cacheGeneration)
                 try Task.checkCancellation()
                 let runLanguage: String? = language.transcribeCppLanguageCode(for: family)
                 // Only pass native vocabulary when the loaded model advertises
@@ -226,8 +235,11 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
         didFail = false
     }
 
-    private func cache(_ model: TranscribeCpp.Model, at url: URL, generation: Int, cacheGeneration: Int) {
-        guard generation == self.generation, cacheGeneration == modelCache.generation else { return }
+    private func cache(_ model: TranscribeCpp.Model, at url: URL, cacheGeneration: Int) {
+        // Loading weights succeeds independently of session cancellation. Never
+        // refill a deselected cache or replace a newly configured checkpoint.
+        guard cacheGeneration == modelCache.generation,
+              url == (configuredModelURL ?? modelURLProvider()) else { return }
         // Keep one checkpoint across all backend instances. Release native
         // weights on a worker when another checkpoint replaces the cache.
         let previous = modelCache.model

@@ -75,7 +75,7 @@ final class AppState {
         }
         streamingTranscriptionService?.onPartialText = { [weak self] text in
             guard let self, self.isRecording, !text.isEmpty else { return }
-            self.statusMessage = "Recording: \(String(text.prefix(50)))\(text.count > 50 ? "..." : "")"
+            self.statusMessage = "Recording: \(text.count > 50 ? "..." : "")\(String(text.suffix(50)))"
         }
 
         streamingTranscriptionService?.onStatusChange = { [weak self] status in

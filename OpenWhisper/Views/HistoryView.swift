@@ -42,7 +42,7 @@ struct HistoryView: View {
                                 .font(.body)
                                 .lineLimit(4)
                                 .textSelection(.enabled)
-                                .accessibilityIdentifier("history.entry.\(entry.text)")
+                                .accessibilityIdentifier(LaunchConfiguration.current.isTestMode ? "history.entry.\(entry.text)" : "history.entry.\(entry.id)")
 
                             HStack {
                                 Text(relativeTime(from: entry.date))

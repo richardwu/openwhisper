@@ -4,6 +4,23 @@ import SwiftWhisper
 
 final class ModelCatalogTests: XCTestCase {
     @MainActor
+    func testMissingModelFixtureIsUnavailableForEveryBackend() {
+        let suiteName = "com.openwhisper.missing-backends.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let manager = ModelManager(mode: .missing, defaults: defaults)
+        for backend in TranscriptionBackend.allCases {
+            manager.selectedBackend = backend
+            XCTAssertFalse(manager.isModelReady, backend.rawValue)
+            XCTAssertFalse(manager.isAvailableLocally(backend), backend.rawValue)
+        }
+    }
+
+    func testNorwegianUsesApplesBokmalLocaleCode() {
+        XCTAssertEqual(WhisperLanguage.norwegian.appleLocale.languageCode, "nb")
+    }
+
+    @MainActor
     func testAppleLanguagePersistsAcrossRelaunchAndBackendSelection() {
         let suiteName = "com.openwhisper.apple-language.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

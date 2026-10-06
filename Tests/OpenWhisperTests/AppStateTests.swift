@@ -98,6 +98,15 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(state.pasteService.pastedTexts, ["Hello world"])
     }
 
+    func testLivePreviewShowsNewestWords() async {
+        let decoder = StubStreamingTranscriptionService(finalText: String(repeating: "opening words ", count: 10) + "LATEST WORDS")
+        let state = makeStreamingAppState(decoder: decoder)
+        await state.toggleRecording()
+        XCTAssertTrue(state.statusMessage.hasPrefix("Recording: ..."))
+        XCTAssertTrue(state.statusMessage.hasSuffix("LATEST WORDS"))
+        state.cancelRecording()
+    }
+
     func testCancelDuringFinishRejectsLateResultsAfterRestart() async {
         let decoder = StubStreamingTranscriptionService(finalText: "New recording")
         var resumeFinish: CheckedContinuation<Void, Never>?
@@ -212,7 +221,9 @@ final class AppStateTests: XCTestCase {
         defaults.set(TranscriptionBackend.appleStreaming.rawValue, forKey: "selectedBackend")
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let manager = ModelManager(mode: .missing, defaults: defaults)
+        let missingCheckpoint = FileManager.default.temporaryDirectory
+            .appendingPathComponent("missing-whisper-\(UUID().uuidString).bin")
+        let manager = ModelManager(mode: .fixedPath(missingCheckpoint), defaults: defaults)
 
         XCTAssertEqual(manager.selectedBackend, .appleStreaming)
         XCTAssertTrue(manager.isModelReady)
