@@ -98,6 +98,30 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(state.pasteService.pastedTexts, ["Hello world"])
     }
 
+    func testCancelDuringFinishRejectsLateResultsAfterRestart() async {
+        let decoder = StubStreamingTranscriptionService(finalText: "New recording")
+        var resumeFinish: CheckedContinuation<Void, Never>?
+        decoder.onFinish = { await withCheckedContinuation { resumeFinish = $0 } }
+        let state = makeStreamingAppState(decoder: decoder)
+        await state.toggleRecording()
+        let finishing = Task { await state.toggleRecording() }
+        while resumeFinish == nil { await Task.yield() }
+        XCTAssertTrue(state.isTranscribing)
+        state.cancelRecording()
+        XCTAssertFalse(state.isTranscribing)
+        XCTAssertEqual(state.overlayState.phase, .cancelled)
+        decoder.onFinish = nil
+        await state.toggleRecording()
+        resumeFinish?.resume()
+        await finishing.value
+        XCTAssertTrue(state.isRecording, "Old finalization must not clear the new recording")
+        XCTAssertEqual(state.overlayState.phase, .recording)
+        XCTAssertTrue(state.pasteService.pastedTexts.isEmpty)
+        XCTAssertTrue(state.historyStore.entries.isEmpty)
+        await state.toggleRecording()
+        XCTAssertEqual(state.pasteService.pastedTexts, ["New recording"])
+    }
+
     func testStreamingStartupFailureStopsRecordingImmediately() async {
         let decoder = StubStreamingTranscriptionService(finalText: "Unused")
         decoder.beginFailure = TranscriptionError.stubError

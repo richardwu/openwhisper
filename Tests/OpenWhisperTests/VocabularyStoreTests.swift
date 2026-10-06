@@ -21,6 +21,14 @@ final class VocabularyStoreTests: XCTestCase {
         super.tearDown()
     }
 
+    func testAbbreviationsAndOrdinaryHyphenatedPhrasesStayUnchanged() {
+        let text = "Use tools, e.g. Docker, i.e. containers, etc. I'll follow up with you and stand up the server."
+        XCTAssertEqual(store.correctTranscription(text), text)
+        XCTAssertEqual(store.correctTranscription("fine tuning on device"), "fine tuning on device")
+        XCTAssertTrue(store.learn(term: "follow-up"))
+        XCTAssertEqual(store.correctTranscription("follow up"), "follow-up")
+    }
+
     func testBundledAcronymsDoNotRewriteOrdinaryWordsOrNames() {
         let text = "Ask Sam about the rest of the day, til Tam and Som meet Eta."
         XCTAssertEqual(store.correctTranscription(text), text)
@@ -135,6 +143,7 @@ final class VocabularyStoreTests: XCTestCase {
     }
 
     func testLocalCorrectionRepairsTechnicalPhraseAndPreservesPunctuation() {
+        XCTAssertEqual(store.correctTranscription("post crescue"), "post-crescue")
         XCTAssertEqual(
             store.correctTranscription("Please add post rescue, then use nasdaq."),
             "Please add post-crescue, then use NASDAQ."

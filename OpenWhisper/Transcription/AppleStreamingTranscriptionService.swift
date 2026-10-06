@@ -15,6 +15,7 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
     private var language: WhisperLanguage
     private let vocabularyStore: VocabularyStore?
     private var startupTask: Task<Void, Error>?
+    private var cleanupTask: Task<Void, Never>?
     private var analyzer: SpeechAnalyzer?
     private var transcriber: SpeechTranscriber?
     private var continuation: AsyncStream<AnalyzerInput>.Continuation?
@@ -54,6 +55,7 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
     func begin() {
         cancel()
         let currentGeneration = generation
+        let cleanup = cleanupTask
         acceptingFrames = true
         pendingFrames = []
         finalText = ""
@@ -64,6 +66,8 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         startupTask = Task { @MainActor [weak self] in
             guard let self else { return }
             do {
+                await cleanup?.value
+                try self.checkSession(generation: currentGeneration)
                 try await self.prepare(generation: currentGeneration)
             } catch {
                 if currentGeneration == generation, !(error is CancellationError) {
@@ -133,6 +137,12 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         continuation = nil
         resultsTask?.cancel()
         resultsTask = nil
+        let previousAnalyzer = analyzer
+        let previousCleanup = cleanupTask
+        cleanupTask = Task {
+            await previousCleanup?.value
+            await previousAnalyzer?.cancelAndFinishNow()
+        }
         analyzer = nil
         transcriber = nil
         audioFormat = nil
@@ -184,6 +194,7 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         try checkSession(generation: generation)
 
         let analyzer = SpeechAnalyzer(modules: [transcriber])
+        self.analyzer = analyzer
         if let vocabularyStore {
             let context = AnalysisContext()
             // Apple accepts up to 100 short contextual phrases. Learned terms

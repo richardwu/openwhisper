@@ -4,6 +4,20 @@ import SwiftWhisper
 
 final class ModelCatalogTests: XCTestCase {
     @MainActor
+    func testAppleLanguagePersistsAcrossRelaunchAndBackendSelection() {
+        let suiteName = "com.openwhisper.apple-language.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let manager = ModelManager(mode: .ready, defaults: defaults)
+        manager.selectedLanguage = .german
+        manager.selectBackend(.appleStreaming)
+        XCTAssertEqual(manager.selectedLanguage, .german)
+        XCTAssertEqual(ModelManager(mode: .ready, defaults: defaults).selectedLanguage, .german)
+        manager.selectBackend(.moonshineStreamingSmall)
+        XCTAssertEqual(manager.selectedLanguage, .english)
+    }
+
+    @MainActor
     func testCancelledDownloadClearsCurrentProgressState() async {
         let suiteName = "com.openwhisper.cancelled-download.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

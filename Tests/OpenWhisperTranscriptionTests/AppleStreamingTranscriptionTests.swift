@@ -44,6 +44,16 @@ final class AppleStreamingTranscriptionTests: XCTestCase {
         XCTAssertTrue(text.contains("this is me testing"), "Unexpected final text: \(text)")
         XCTAssertTrue(text.contains("work properly"), "Unexpected final text: \(text)")
         XCTAssertEqual(partials.count, Set(partials).count, "The shared router must skip duplicate previews")
+
+        // Exercise cancellation during preparation/analysis, then reuse the decoder.
+        service.begin()
+        service.append(audioFrames: samples)
+        try await Task.sleep(for: .milliseconds(20))
+        service.cancel()
+        service.begin()
+        service.append(audioFrames: samples)
+        let restarted = try await service.finish().lowercased()
+        XCTAssertTrue(restarted.contains("work properly"), "Unexpected restarted text: \(restarted)")
     }
 
     private func readSamples(url: URL) throws -> [Float] {

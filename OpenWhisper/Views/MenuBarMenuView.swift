@@ -20,6 +20,9 @@ struct MenuBarMenuView: View {
         }
 
         recordingButton
+        if appState.isTranscribing {
+            Button("Cancel Transcription") { appState.cancelRecording() }
+        }
 
         Divider()
 

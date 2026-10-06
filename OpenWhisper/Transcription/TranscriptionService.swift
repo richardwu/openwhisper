@@ -24,6 +24,8 @@ final class TranscriptionService {
     private var whisperInstance: Whisper?
     private var loadedModelURL: URL?
     private var loadedLanguage: WhisperLanguage?
+    private var generation = 0
+    private var cancellationTask: Task<Void, Never>?
     private var promptPointer: UnsafeMutablePointer<CChar>?
 
     init(mode: Mode = .live, vocabularyStore: VocabularyStore? = VocabularyStore()) {
@@ -43,20 +45,35 @@ final class TranscriptionService {
         language: WhisperLanguage = .english,
         initialPrompt: String? = nil
     ) async throws -> String {
+        let currentGeneration = generation
+        await cancellationTask?.value
+        guard currentGeneration == generation else { throw CancellationError() }
+        cancellationTask = nil
+        let rawText: String
         switch mode {
         case .live:
             let whisper = try getOrCreateWhisper(modelURL: modelURL, language: language)
             updateInitialPrompt(vocabularyStore?.makePrompt(extra: initialPrompt) ?? initialPrompt, on: whisper.params)
             let segments = try await whisper.transcribe(audioFrames: audioFrames)
-            let rawText = segments.map(\.text).joined()
-            return await finalizeTranscription(rawText)
+            rawText = segments.map(\.text).joined()
         case .stub(let result):
             // Keep fixture transcription on the same finalization path as a
             // live decoder, including filtering and local vocabulary repair.
-            return await finalizeTranscription(result)
+            rawText = result
         case .stubError:
             throw TranscriptionError.stubError
         }
+        guard currentGeneration == generation else { throw CancellationError() }
+        let text = await finalizeTranscription(rawText)
+        guard currentGeneration == generation else { throw CancellationError() }
+        return text
+    }
+
+    func cancel() {
+        generation &+= 1
+        guard cancellationTask == nil, let whisper = whisperInstance, whisper.inProgress else { return }
+        // A new batch request waits for native cancellation before reusing weights.
+        cancellationTask = Task { try? await whisper.cancel() }
     }
 
     /// Adds one explicitly reviewed spelling to the local prompt vocabulary.
@@ -115,7 +132,7 @@ final class TranscriptionService {
         // Remove <|...|> special tokens
         result = result.replacingOccurrences(of: "<\\|[^|]*\\|>", with: "", options: .regularExpression)
         // Strip known non-speech markers while preserving dictated brackets.
-        let marker = "(?:blank[_ ]audio|music|inaudible|no sound|silence|applause|laughter|noise|speaking foreign language|cough(?:s|ing)?|door slam(?:s|ming)?)"
+        let marker = "(?:blank[_ ]audio|inaudible|no sound|silence|applause|laughter|speaking foreign language|cough(?:s|ing)?|door slam(?:s|ming)?|(?:keyboard )?typing|(?:[a-z-]+ )*(?:music|noise)|wind blowing|clapping|footsteps|(?:dog )?barking|laughing|sighs?|breathing|sobbing|clears throat)"
         for (open, close) in [("\\[", "\\]"), ("\\(", "\\)")] {
             result = result.replacingOccurrences(of: "(?i)" + open + "\\s*" + marker + "\\s*" + close,
                                                   with: "", options: .regularExpression)

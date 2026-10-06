@@ -13,6 +13,7 @@ case "${1:-}" in
       -only-testing:OpenWhisperTranscriptionTests/NemotronStreamingTranscriptionTests
       -only-testing:OpenWhisperTranscriptionTests/FluidAudioStreamingTranscriptionTests
       -only-testing:OpenWhisperTranscriptionTests/BackgroundDictationJourneyTests
+      -only-testing:OpenWhisperTranscriptionTests/RealTranscriptionTests/testCancelAndRestartUsesFreshBatchSession
     )
     # Forward model overrides to XCTest. Reuse workspace experiment assets.
     if [[ -n "${OPENWHISPER_MOONSHINE_MODEL:-}" ]]; then

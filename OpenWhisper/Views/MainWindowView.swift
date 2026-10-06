@@ -180,7 +180,7 @@ struct MainWindowView: View {
                         }
                         .accessibilityIdentifier("recording.toggle")
                         Button("Cancel Recording") { appState.cancelRecording() }
-                            .disabled(!appState.isRecording)
+                            .disabled(!appState.isRecording && !appState.isTranscribing)
                             .accessibilityIdentifier("recording.cancel")
                     }
                     .padding(.bottom, 12)

@@ -33,7 +33,8 @@ final class MoonshineStreamingTranscriptionTests: XCTestCase {
 
         // The second recording reuses the model with a fresh native session.
         for recording in 0..<3 {
-            service.configure(language: .english, modelURL: modelURL)
+            // Direct stale settings must normalize safely for English-only checkpoints.
+            service.configure(language: recording == 0 ? .german : .english, modelURL: modelURL)
             partials.removeAll()
             if recording == 2 {
                 service.begin()

@@ -320,7 +320,7 @@ private extension WhisperLanguage {
             return self == .auto ? nil : rawValue
         case .moonshineStreaming, .nemotronSpeechStreaming,
              .parakeetBuffered, .multitalkerParakeetStreaming:
-            assert(self == .english, "This streaming family supports English only")
+            // These checkpoints accept English only, including stale/direct settings.
             return "en"
         }
     }

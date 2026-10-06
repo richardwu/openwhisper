@@ -33,6 +33,7 @@ final class AppState {
     private var activeHotkeyMode: RecordingTriggerMode?
     private var hotkeyStartedRecording = false
     private var hotkeyWasCancelled = false
+    private var recordingGeneration = 0
 
     let audioRecorder: AudioRecorder
     let streamingTranscriptionService: (any StreamingTranscriptionService)?
@@ -149,25 +150,30 @@ final class AppState {
     }
 
     func cancelRecording() {
-        guard isRecording else { return }
+        guard isRecording || isTranscribing else { return }
         stopRecording()
         statusMessage = "Ready"
         overlayState.phase = .cancelled
+        let generation = recordingGeneration
         // Show "Recording Cancelled" briefly, then dismiss
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
-            guard self?.overlayState.phase == .cancelled else { return }
+            guard self?.recordingGeneration == generation, self?.overlayState.phase == .cancelled else { return }
             self?.overlayState.phase = .hidden
             self?.overlayController?.dismiss()
         }
     }
 
     private func stopRecording() {
-        guard isRecording else { return }
+        guard isRecording || isTranscribing else { return }
         // Keep the latch until release so held keys cannot restart recording.
         hotkeyWasCancelled = activeHotkeyMode != nil
         hotkeyStartedRecording = false
+        let wasRecording = isRecording
         isRecording = false
-        _ = audioRecorder.stopRecording()
+        isTranscribing = false
+        recordingGeneration &+= 1
+        if wasRecording { _ = audioRecorder.stopRecording() }
+        transcriptionService.cancel()
         streamingTranscriptionService?.cancel()
         recordingSettings = nil
         syncCancelRecordingHotkey()
@@ -211,6 +217,7 @@ final class AppState {
             return
         }
 
+        recordingGeneration &+= 1
         do {
             // Tap delivery hops to the main actor, so this synchronous setup
             // pins the decoder before any queued audio callback can run.
@@ -249,6 +256,7 @@ final class AppState {
     }
 
     private func stopRecordingAndTranscribe() async {
+        let generation = recordingGeneration
         let settings = recordingSettings
         let backend = settings?.backend ?? modelManager.selectedBackend
         let samples = audioRecorder.stopRecording()
@@ -266,11 +274,15 @@ final class AppState {
             return
         }
         isTranscribing = true
+        syncCancelRecordingHotkey()
         statusMessage = "Processing..."
         overlayState.phase = .transcribing
         defer {
-            isTranscribing = false
-            recordingSettings = nil
+            if generation == recordingGeneration {
+                isTranscribing = false
+                recordingSettings = nil
+                syncCancelRecordingHotkey()
+            }
         }
 
         var streamedText: String?
@@ -278,7 +290,9 @@ final class AppState {
            let streamingTranscriptionService {
             do {
                 streamedText = try await streamingTranscriptionService.finish()
+                guard generation == recordingGeneration else { return }
             } catch {
+                guard generation == recordingGeneration else { return }
                 statusMessage = "\(backend.statusName) error: \(error.localizedDescription)"
                 overlayState.phase = .hidden
                 overlayController?.dismiss()
@@ -325,6 +339,7 @@ final class AppState {
                 )
             }
 
+            guard generation == recordingGeneration else { return }
             if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 statusMessage = "No speech detected"
             } else {
@@ -341,7 +356,7 @@ final class AppState {
                     isTranscribing = false
 
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-                        guard self?.overlayState.phase == .accessibilityRequired else { return }
+                        guard self?.recordingGeneration == generation, self?.overlayState.phase == .accessibilityRequired else { return }
                         self?.overlayState.phase = .hidden
                         self?.overlayController?.dismiss()
                     }
@@ -349,6 +364,7 @@ final class AppState {
                 }
             }
         } catch {
+            guard generation == recordingGeneration else { return }
             statusMessage = "Transcription error: \(error.localizedDescription)"
         }
 
@@ -359,7 +375,7 @@ final class AppState {
 
     func syncCancelRecordingHotkey() {
         guard !launchConfig.disableHotkeys else { return }
-        if isRecording {
+        if isRecording || isTranscribing {
             KeyboardShortcuts.enable(.cancelRecording)
         } else {
             KeyboardShortcuts.disable(.cancelRecording)

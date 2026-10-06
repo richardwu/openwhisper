@@ -333,11 +333,9 @@ final class ModelManager {
         didSet {
             if selectedBackend != oldValue { onBackendChange?() }
             defaults.set(selectedBackend.rawValue, forKey: DefaultsKey.selectedBackend)
-            // Apple Speech and the bundled streaming models currently expose
-            // only English in the settings picker. Nemotron 3.5 exposes a
-            // smaller, explicit BCP-47 locale list. Reset a persisted Whisper
-            // language when the selected backend cannot accept that language.
-            if selectedBackend == .appleStreaming || selectedBackend.isEnglishOnly {
+            // Reset only languages that the selected checkpoint cannot accept.
+            // Apple-supported languages are refreshed asynchronously by Settings.
+            if selectedBackend.isEnglishOnly {
                 selectedLanguage = .english
             } else if let supported = selectedBackend.supportedLanguageOptions,
                       !supported.contains(selectedLanguage) {
@@ -479,7 +477,7 @@ final class ModelManager {
         }()
         self.selectedBackend = initialSelectedBackend
         let storedLanguageValue = WhisperLanguage(rawValue: storedLanguage) ?? .english
-        if initialSelectedBackend == .appleStreaming || initialSelectedBackend.isEnglishOnly {
+        if initialSelectedBackend.isEnglishOnly {
             self.selectedLanguage = .english
         } else if let supported = initialSelectedBackend.supportedLanguageOptions,
                   !supported.contains(storedLanguageValue) {

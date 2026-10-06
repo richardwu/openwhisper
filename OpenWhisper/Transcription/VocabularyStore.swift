@@ -335,15 +335,21 @@ final class VocabularyStore {
         let hasTechnicalSpelling: Bool
     }
 
-    // ponytail: known ambiguous acronyms require learning; add contextual
+    // ponytail: known ambiguous terms require learning; add contextual
     // matching if users need them corrected automatically.
-    private static let ambiguousBundledKeys: Set<String> = ["rest", "sam", "tam", "som", "til", "eta", "ram"]
+    private static let ambiguousBundledKeys: Set<String> = [
+        "rest", "sam", "tam", "som", "til", "eta", "ram",
+        "followup", "standup", "finetuning", "ondevice"
+    ]
 
     private func correctionVocabulary() -> [CorrectionVocabularyTerm] {
         let records = loadLearnedTerms()
         let learnedKeys = Set(records.map { Self.comparisonKey($0.term) })
         var seen = Set<String>()
         return candidateTerms(from: records).compactMap { term in
+            // Sentence punctuation is outside token ranges; adding it duplicates
+            // periods in abbreviations such as e.g., i.e., and etc.
+            guard !term.hasSuffix(".") else { return nil }
             let key = Self.correctionKey(term)
             guard !key.isEmpty, seen.insert(key).inserted else { return nil }
             let learned = learnedKeys.contains(Self.comparisonKey(term))
