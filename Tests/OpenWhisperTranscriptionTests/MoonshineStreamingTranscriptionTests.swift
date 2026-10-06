@@ -28,7 +28,15 @@ final class MoonshineStreamingTranscriptionTests: XCTestCase {
         )
         var partials: [String] = []
         var statuses: [String] = []
-        service.onStatusChange = { statuses.append($0) }
+        let caughtUp = expectation(description: "Native audio backlog clears while recording")
+        var didCatchUp = false
+        service.onStatusChange = { status in
+            statuses.append(status)
+            if status == "Recording...", !didCatchUp {
+                didCatchUp = true
+                caughtUp.fulfill()
+            }
+        }
         service.onPartialText = { text in
             if !text.isEmpty { partials.append(text) }
         }
@@ -62,9 +70,7 @@ final class MoonshineStreamingTranscriptionTests: XCTestCase {
             }
             if recording == 0 {
                 // Let the warm worker catch up while recording stays active.
-                for _ in 0..<200 where !statuses.contains("Recording...") {
-                    try await Task.sleep(for: .milliseconds(20))
-                }
+                await fulfillment(of: [caughtUp], timeout: 10)
                 XCTAssertTrue(statuses.contains { $0.hasPrefix("Recording...") && $0.contains("audio queued") })
                 XCTAssertEqual(statuses.last, "Recording...", "A drained backlog must clear its warning")
                 service.append(audioFrames: [0])

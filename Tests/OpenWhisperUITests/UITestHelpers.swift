@@ -29,16 +29,22 @@ extension XCUIApplication {
 }
 
 extension XCUIElement {
-    /// Resolve identifiers without depending on how SwiftUI exposes a view's role.
-    func historyElement(_ action: String, text: String) -> XCUIElement {
+    func historyElement(
+        _ action: String, text: String, file: StaticString = #filePath, line: UInt = #line
+    ) -> XCUIElement {
         let entry = descendants(matching: .any).matching(NSPredicate(
             format: "identifier BEGINSWITH %@ AND (label == %@ OR value == %@)",
             "history.entry.", text, text
         )).firstMatch
         if action == "entry" { return entry }
+        guard entry.waitForExistence(timeout: 5) else {
+            XCTFail("History entry not found: \(text)", file: file, line: line)
+            return entry
+        }
         return element(entry.identifier.replacingOccurrences(of: "history.entry.", with: "history.\(action)."))
     }
 
+    /// Resolve identifiers without depending on how SwiftUI exposes a view's role.
     func element(_ identifier: String) -> XCUIElement {
         descendants(matching: .any).matching(identifier: identifier).firstMatch
     }

@@ -13,3 +13,11 @@ Read [CLAUDE.md](CLAUDE.md) for build, signing, and repository conventions.
 - Use `TranscriptionService.finalizeTranscription` for final filtering and vocabulary correction before paste/history.
 - Run `scripts/test_background.sh --real-models` after changing a streaming backend or this shared path. Verify the all-backend lifecycle test, bounded/changed preview tests, main-actor heartbeat, cancellation/restart, and the long Parakeet replay. Unavailable model skips are not successful hardware checks; report them.
 - Prefer background tests and hidden-window rendering. Native UI automation can take over the user's desktop; reserve it for a separate test session or Mac.
+
+## Before merging into main
+
+UI E2E CI runs on pushes to `main`, including merges. PR CI does not run UI E2E tests.
+
+1. Before merging, run `scripts/test_ui_e2e.sh` locally on the exact commit to merge. Use a separate test session or Mac because UI automation controls the desktop.
+2. If UI E2E tests fail, fix the failures, push the fixes, run `/babysit`, and rerun `scripts/test_ui_e2e.sh` locally.
+3. Repeat until the latest PR CI is green and local UI E2E tests pass on the latest commit. Merge only after both conditions hold. Any additional code change requires another local UI E2E pass.

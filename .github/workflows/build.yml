@@ -57,6 +57,7 @@ jobs:
           retention-days: 1
 
   ui-e2e:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: macos-15
     needs: build-and-unit
     steps:
