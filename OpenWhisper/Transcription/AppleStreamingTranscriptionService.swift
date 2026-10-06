@@ -192,10 +192,10 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
 
         if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
             try checkSession(generation: generation)
-            onStatusChange?("Recording (downloading Apple speech model)...")
+            if acceptingFrames { onStatusChange?("Recording (downloading Apple speech model)...") }
             try await request.downloadAndInstall()
             try checkSession(generation: generation)
-            onStatusChange?("Recording...")
+            if acceptingFrames { onStatusChange?("Recording...") }
         }
         try checkSession(generation: generation)
 
@@ -294,7 +294,11 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
         guard let last = left.last, let first = right.first else { return left + right }
         // Chinese and Japanese words do not require spaces between segments.
         let unspaced = language == .chinese || language == .japanese
-        let separator = unspaced || last.isWhitespace || first.isWhitespace || first.isPunctuation ? "" : " "
+        let opensSegment = "\"'".contains(first) || first.unicodeScalars.allSatisfy {
+            $0.properties.generalCategory == .openPunctuation || $0.properties.generalCategory == .initialPunctuation
+        }
+        let closesSegment = first.isPunctuation && !opensSegment
+        let separator = unspaced || last.isWhitespace || first.isWhitespace || closesSegment ? "" : " "
         return left + separator + right
     }
 

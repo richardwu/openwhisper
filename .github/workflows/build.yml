@@ -119,17 +119,17 @@ jobs:
         id: cache-model
         uses: actions/cache@v4
         with:
-          path: .build/models/ggml-base.bin
-          key: whisper-model-base-60ed5bc3dd14eea8
+          path: .build/models/ggml-small-q5_1.bin
+          key: whisper-model-small-q5_1-ae85e4a935d7a567
 
       - name: Download Whisper model
         run: |
           mkdir -p .build/models
-          if [ ! -f .build/models/ggml-base.bin ]; then
-            curl --fail --location -o .build/models/ggml-base.bin \
-              "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.bin"
+          if [ ! -f .build/models/ggml-small-q5_1.bin ]; then
+            curl --fail --location -o .build/models/ggml-small-q5_1.bin \
+              "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-small-q5_1.bin"
           fi
-          echo "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe  .build/models/ggml-base.bin" | shasum -a 256 -c -
+          echo "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb  .build/models/ggml-small-q5_1.bin" | shasum -a 256 -c -
 
       - name: Generate Xcode project
         run: xcodegen generate
@@ -146,7 +146,7 @@ jobs:
 
       - name: Run real transcription tests
         env:
-          TEST_RUNNER_OPENWHISPER_MODEL_PATH: ${{ github.workspace }}/.build/models/ggml-base.bin
+          TEST_RUNNER_OPENWHISPER_MODEL_PATH: ${{ github.workspace }}/.build/models/ggml-small-q5_1.bin
         run: |
           xcodebuild test \
             -scheme OpenWhisper \

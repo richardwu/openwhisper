@@ -10,6 +10,11 @@ final class StreamingTranscriptionTests: XCTestCase {
             XCTAssertEqual(AppleStreamingTranscriptionService.joinSegments("hello ", "world"), "hello world")
             XCTAssertEqual(AppleStreamingTranscriptionService.joinSegments("hello", ", world"), "hello, world")
             XCTAssertEqual(AppleStreamingTranscriptionService.joinSegments("", "hello"), "hello")
+            XCTAssertEqual(AppleStreamingTranscriptionService.joinSegments("He said", "\"hello\""), "He said \"hello\"")
+            XCTAssertEqual(AppleStreamingTranscriptionService.joinSegments("See", "[notes]"), "See [notes]")
+            XCTAssertEqual(AppleStreamingTranscriptionService.joinSegments("(notes", ")"), "(notes)")
+            XCTAssertEqual(AppleStreamingTranscriptionService.joinSegments("مرحبا", "، عالم", language: .arabic), "مرحبا، عالم")
+            XCTAssertEqual(AppleStreamingTranscriptionService.joinSegments("He said", "“hello”"), "He said “hello”")
             XCTAssertEqual(AppleStreamingTranscriptionService.joinSegments("你好", "世界", language: .chinese), "你好世界")
             XCTAssertEqual(AppleStreamingTranscriptionService.joinSegments("こんにちは", "世界", language: .japanese), "こんにちは世界")
         }

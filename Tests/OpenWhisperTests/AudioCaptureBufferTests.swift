@@ -3,6 +3,17 @@ import XCTest
 @testable import OpenWhisper
 
 final class AudioCaptureBufferTests: XCTestCase {
+    @MainActor
+    func testFixtureCaptureDeliversFramesToStreamingCallback() throws {
+        let samples: [Float] = [0.1, 0.2, 0.3]
+        let recorder = AudioRecorder(mode: .fixture(samples: samples))
+        var streamed: [Float] = []
+        recorder.onAudioFrames = { streamed += $0 }
+        try recorder.startRecording(retainSamples: false)
+        XCTAssertEqual(recorder.stopRecording(), samples)
+        XCTAssertEqual(streamed, samples)
+    }
+
     func testStreamingCaptureFlushesTailWithoutRetainingFullRecording() throws {
         let inputFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48_000,
                                        channels: 1, interleaved: false)!

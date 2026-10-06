@@ -167,6 +167,7 @@ final class AudioRecorder {
             return stopLiveRecording()
         case .fixture(let fixtureSamples):
             recentLevels = Array(repeating: 0, count: 30)
+            if !fixtureSamples.isEmpty { onAudioFrames?(fixtureSamples) }
             return fixtureSamples
         }
     }
