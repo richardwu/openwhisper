@@ -79,7 +79,7 @@ final class AppState {
         }
 
         streamingTranscriptionService?.onStatusChange = { [weak self] status in
-            guard let self, self.isRecording else { return }
+            guard let self, self.isRecording || self.isTranscribing else { return }
             self.statusMessage = status
         }
         streamingTranscriptionService?.onFailure = { [weak self] error in

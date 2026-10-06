@@ -27,6 +27,8 @@ final class MoonshineStreamingTranscriptionTests: XCTestCase {
             modelURLProvider: { nil }, modelCache: cache
         )
         var partials: [String] = []
+        var statuses: [String] = []
+        service.onStatusChange = { statuses.append($0) }
         service.onPartialText = { text in
             if !text.isEmpty { partials.append(text) }
         }
@@ -36,6 +38,7 @@ final class MoonshineStreamingTranscriptionTests: XCTestCase {
             // Direct stale settings must normalize safely for English-only checkpoints.
             service.configure(language: recording == 0 ? .german : .english, modelURL: modelURL)
             partials.removeAll()
+            statuses.removeAll()
             if recording == 2 {
                 service.begin()
                 service.append(audioFrames: Array(samples.prefix(3_200)))
@@ -64,6 +67,9 @@ final class MoonshineStreamingTranscriptionTests: XCTestCase {
             } else {
                 XCTAssertNotNil(cache.model)
             }
+            XCTAssertTrue(statuses.contains { $0.hasPrefix("Processing...") && $0.contains("audio queued") },
+                          "Stop should report the ordered audio backlog")
+            XCTAssertEqual(statuses.last, "Processing...")
             XCTAssertFalse(partials.isEmpty, "Moonshine should publish a partial transcript")
             XCTAssertTrue(text.contains("this is me testing"), "Unexpected final text: \(text)")
             XCTAssertTrue(text.contains("work properly"), "Unexpected final text: \(text)")

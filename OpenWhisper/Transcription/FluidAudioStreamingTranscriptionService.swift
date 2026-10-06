@@ -19,7 +19,7 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
     private var startupTask: Task<Void, Error>?
     private var processingTask: Task<Void, Never>?
     private var cleanupTask: Task<Void, Never>?
-    private var finishingTask: Task<String, Error>?
+    private var finishingTask: Task<(String, Bool), Error>?
     private var pendingFrames: [[Float]] = []
     private var lastPartial = ""
     private var modelsLoaded = false
@@ -150,14 +150,19 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
                 try Task.checkCancellation()
                 let text = try await manager.finish()
                 _ = await manager.consumeTokenTimings()
-                try await manager.reset()
-                return text
+                // Preserve completed speech, but retry failed cleanup before restart.
+                do {
+                    try await manager.reset()
+                    return (text, true)
+                } catch {
+                    return (text, false)
+                }
             }
             finishingTask = task
-            let text = try await task.value
+            let (text, wasReset) = try await task.value
             guard currentGeneration == generation else { throw CancellationError() }
             finishingTask = nil
-            startupTask = nil
+            if wasReset { startupTask = nil }
             lastPartial = ""
             return text
         } catch {

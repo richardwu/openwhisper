@@ -66,7 +66,7 @@ struct HistoryView: View {
                                 .buttonStyle(.borderless)
                                 .help("Copy to clipboard")
                                 .accessibilityLabel("Copy transcription")
-                                .accessibilityIdentifier("history.copy.\(entry.text)")
+                                .accessibilityIdentifier(LaunchConfiguration.current.isTestMode ? "history.copy.\(entry.text)" : "history.copy.\(entry.id)")
 
                                 Button {
                                     entryToDelete = entry
@@ -78,7 +78,7 @@ struct HistoryView: View {
                                 .buttonStyle(.borderless)
                                 .help("Delete")
                                 .accessibilityLabel("Delete transcription")
-                                .accessibilityIdentifier("history.delete.\(entry.text)")
+                                .accessibilityIdentifier(LaunchConfiguration.current.isTestMode ? "history.delete.\(entry.text)" : "history.delete.\(entry.id)")
                             }
                         }
                         .padding(.vertical, 4)

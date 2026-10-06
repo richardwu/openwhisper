@@ -82,6 +82,16 @@ final class AppleStreamingTranscriptionService: StreamingTranscriptionService {
     func append(audioFrames: [Float]) {
         guard acceptingFrames, !audioFrames.isEmpty, !didFail else { return }
         guard let continuation, let audioFormat else {
+            // ponytail: cap cold preparation at three minutes of 16 kHz audio;
+            // preinstall assets if first-use preparation needs longer.
+            guard pendingFrames.reduce(0, { $0 + $1.count }) + audioFrames.count <= 16_000 * 180 else {
+                didFail = true
+                acceptingFrames = false
+                pendingFrames.removeAll(keepingCapacity: false)
+                onFailure?(NSError(domain: "OpenWhisper.AppleStreaming", code: 4,
+                    userInfo: [NSLocalizedDescriptionKey: "Apple speech preparation exceeded the audio buffer limit. Please try again."]))
+                return
+            }
             pendingFrames.append(audioFrames)
             return
         }

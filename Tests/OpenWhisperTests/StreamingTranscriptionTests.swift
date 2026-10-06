@@ -15,6 +15,21 @@ final class StreamingTranscriptionTests: XCTestCase {
         }
     }
 
+    func testAppleColdPreparationFailsExplicitlyAtAudioLimit() {
+        if #available(macOS 26.0, *) {
+            let decoder = AppleStreamingTranscriptionService()
+            var failures = 0
+            decoder.onFailure = { _ in failures += 1 }
+            decoder.begin()
+            // The main actor has not yielded to preparation yet.
+            decoder.append(audioFrames: [Float](repeating: 0, count: 16_000 * 180 + 1))
+            XCTAssertEqual(failures, 1)
+            decoder.append(audioFrames: [0])
+            XCTAssertEqual(failures, 1)
+            decoder.cancel()
+        }
+    }
+
     func testRouterReportsUnavailableBackendAtStart() {
         let router = BackendStreamingTranscriptionService(
             selectedBackend: { .appleStreaming }, services: [:]

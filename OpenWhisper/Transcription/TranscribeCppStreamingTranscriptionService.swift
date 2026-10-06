@@ -50,6 +50,9 @@ enum TranscribeCppStreamFamily: Sendable {
 final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionService {
     var onPartialText: ((String) -> Void)?
     var onFailure: ((Error) -> Void)?
+    var onStatusChange: ((String) -> Void)?
+    private var queuedFrameCount = 0
+    private var isFinishing = false
 
     private let modelURLProvider: @MainActor () -> URL?
     private let vocabularyStore: VocabularyStore?
@@ -166,9 +169,9 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
                     try Task.checkCancellation()
                     _ = try stream.feed(frame)
                     let text = stream.text.display
-                    guard !text.isEmpty, text != lastPartial else { continue }
+                    let changedText = text != lastPartial ? text : ""
                     lastPartial = text
-                    await self?.publish(text, generation: currentGeneration)
+                    await self?.processed(frameCount: frame.count, text: changedText, generation: currentGeneration)
                 }
 
                 try Task.checkCancellation()
@@ -188,7 +191,9 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
 
     func append(audioFrames: [Float]) {
         guard !audioFrames.isEmpty, !didFail else { return }
-        frameContinuation?.yield(audioFrames)
+        guard let frameContinuation else { return }
+        queuedFrameCount += audioFrames.count
+        frameContinuation.yield(audioFrames)
     }
 
     func finish() async throws -> String {
@@ -196,6 +201,8 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
             throw Self.unavailableError("\(family.displayName) streaming did not start")
         }
 
+        isFinishing = true
+        reportBacklog()
         frameContinuation?.finish()
         frameContinuation = nil
 
@@ -222,6 +229,8 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
 
     func cancel() {
         generation &+= 1
+        queuedFrameCount = 0
+        isFinishing = false
         frameContinuation?.finish()
         frameContinuation = nil
         cleanupWorker = worker ?? cleanupWorker
@@ -248,9 +257,20 @@ final class TranscribeCppStreamingTranscriptionService: StreamingTranscriptionSe
         Task.detached { withExtendedLifetime(previous) {} }
     }
 
-    private func publish(_ text: String, generation: Int) {
-        guard generation == self.generation, !text.isEmpty else { return }
-        onPartialText?(text)
+    private func processed(frameCount: Int, text: String, generation: Int) {
+        guard generation == self.generation else { return }
+        queuedFrameCount = max(0, queuedFrameCount - frameCount)
+        if !text.isEmpty { onPartialText?(text) }
+        reportBacklog()
+    }
+
+    private func reportBacklog() {
+        let seconds = Int(ceil(Double(queuedFrameCount) / 16_000))
+        if isFinishing {
+            onStatusChange?(seconds > 0 ? "Processing... \(seconds)s of audio queued" : "Processing...")
+        } else if seconds >= 5 {
+            onStatusChange?("Recording... \(seconds)s of audio queued")
+        }
     }
 
     private func complete(result: Result<String, Error>, generation: Int) {
