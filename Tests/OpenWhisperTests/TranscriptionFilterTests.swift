@@ -33,7 +33,7 @@ final class TranscriptionFilterTests: XCTestCase {
     }
 
     func testRemovesWhisperSoundAndSpeechTags() {
-        for tag in ["[SOUND]", "(laughs)", "[laughs]", "(sighing)", "(speaks in foreign language)", "[MUSIC PLAYING]"] {
+        for tag in ["[SOUND]", "(laughs)", "[laughs]", "(sighing)", "(speaks in foreign language)", "[MUSIC PLAYING]", "[Pause]", "[crosstalk]", "[ Cheering ]", "(phone ringing)", "(crowd cheering)", "[Speaker 1]"] {
             XCTAssertEqual(service.filterTranscription(tag), "", tag)
         }
     }

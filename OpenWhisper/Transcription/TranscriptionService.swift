@@ -133,7 +133,7 @@ final class TranscriptionService {
         result = result.replacingOccurrences(of: "<\\|[^|]*\\|>", with: "", options: .regularExpression)
         // Reserve known acoustic marker names across backends. Preserve other
         // bracketed content, such as [TODO] and (see attached).
-        let marker = "(?:blank[_ ]audio|inaudible|sound|no sound|silence|applause|laughter|(?:speaking|speaks in) foreign language|cough(?:s|ing)?|door slam(?:s|ming)?|(?:keyboard )?typing|(?:[a-z-]+ )*(?:music|noise)(?: playing)?|wind blowing|water (?:rushing|running)|clapping|footsteps|(?:dog )?barking|laugh(?:s|ing)?|sigh(?:s|ing)?|breathing|sobbing|clears throat)"
+        let marker = "(?:blank[_ ]audio|inaudible|sound|no sound|silence|applause|laughter|(?:speaking|speaks in) foreign language|cough(?:s|ing)?|door slam(?:s|ming)?|(?:keyboard )?typing|(?:[a-z-]+ )*(?:music|noise)(?: playing)?|wind blowing|water (?:rushing|running)|pause|crosstalk|(?:crowd )?cheering|phone ringing|speaker ?[0-9]+|clapping|footsteps|(?:dog )?barking|laugh(?:s|ing)?|sigh(?:s|ing)?|breathing|sobbing|clears throat)"
         for (open, close) in [("\\[", "\\]"), ("\\(", "\\)")] {
             result = result.replacingOccurrences(of: "(?i)" + open + "\\s*" + marker + "\\s*" + close,
                                                   with: "", options: .regularExpression)

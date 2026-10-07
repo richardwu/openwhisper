@@ -448,7 +448,9 @@ final class ModelManager {
         }
     }
 
-    private var modelsDirectory: URL? {
+    private let modelsDirectory: URL?
+
+    private static var defaultModelsDirectory: URL? {
         guard let appSupport = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask
@@ -459,7 +461,9 @@ final class ModelManager {
             .appendingPathComponent("Models")
     }
 
-    init(mode: Mode = .live, defaults: UserDefaults = .standard) {
+    init(mode: Mode = .live, defaults: UserDefaults = .standard, modelsDirectory: URL? = nil) {
+        let modelsDirectory = modelsDirectory ?? Self.defaultModelsDirectory
+        self.modelsDirectory = modelsDirectory
         self.mode = mode
         self.defaults = defaults
         let storedModel = defaults.string(forKey: DefaultsKey.selectedModel) ?? ""
@@ -474,8 +478,15 @@ final class ModelManager {
 
         self.selectedModel = WhisperModel(rawValue: storedModel) ?? .small
         let persistedBackend = TranscriptionBackend(rawValue: storedBackend)
+        let migrateLegacyDefault = storedBackend.isEmpty && storedModel.isEmpty &&
+            ["ggml-small.en-q5_1.bin", WhisperModel.small.fileName].contains { fileName in
+                modelsDirectory.map {
+                    FileManager.default.fileExists(atPath: $0.appendingPathComponent(fileName).path)
+                } ?? false
+            }
         let initialSelectedBackend: TranscriptionBackend = {
             guard let persistedBackend else {
+                if migrateLegacyDefault { return .whisperSmall }
                 return WhisperModel(rawValue: storedModel).map { Self.backend(for: $0) }
                     ?? initialBackend
             }
@@ -490,6 +501,9 @@ final class ModelManager {
             return persistedBackend
         }()
         self.selectedBackend = initialSelectedBackend
+        if migrateLegacyDefault {
+            defaults.set(initialSelectedBackend.rawValue, forKey: DefaultsKey.selectedBackend)
+        }
         let languagePreference = defaults.string(forKey: "selectedLanguage.\(initialSelectedBackend.rawValue)") ?? storedLanguage
         let storedLanguageValue = WhisperLanguage(rawValue: languagePreference) ?? .english
         if initialSelectedBackend.isEnglishOnly {

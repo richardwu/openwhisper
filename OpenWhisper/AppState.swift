@@ -262,17 +262,12 @@ final class AppState {
         let samples = audioRecorder.stopRecording()
         // A synchronous tail callback can fail and cancel this recording.
         guard isRecording else { return }
-        isRecording = false
-        syncCancelRecordingHotkey()
-
         if let error = audioRecorder.lastError {
-            streamingTranscriptionService?.cancel()
-            recordingSettings = nil
-            statusMessage = "Recording error: \(error.localizedDescription)"
-            overlayState.phase = .hidden
-            overlayController?.dismiss()
+            recordingFailed(error)
             return
         }
+        isRecording = false
+        syncCancelRecordingHotkey()
         isTranscribing = true
         syncCancelRecordingHotkey()
         statusMessage = "Processing..."
