@@ -126,24 +126,29 @@ final class ModelCatalogTests: XCTestCase {
     }
 
     @MainActor
-    func testCachedLegacyDefaultSmallSurvivesUpgradeAndCleanup() throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let suiteName = "com.openwhisper.legacy-default.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        defaults.set(WhisperLanguage.spanish.rawValue, forKey: "selectedLanguage")
-        let legacyFile = directory.appendingPathComponent("ggml-small.en-q5_1.bin")
-        try Data().write(to: legacyFile)
-        let manager = ModelManager(mode: .live, defaults: defaults, modelsDirectory: directory)
-        XCTAssertEqual(manager.selectedBackend, .whisperSmall)
-        XCTAssertEqual(manager.selectedLanguage, .spanish)
-        XCTAssertEqual(defaults.string(forKey: "selectedBackend"), TranscriptionBackend.whisperSmall.rawValue)
-        try? FileManager.default.removeItem(at: legacyFile)
-        XCTAssertEqual(ModelManager(mode: .live, defaults: defaults, modelsDirectory: directory).selectedBackend, .whisperSmall)
-        defaults.removePersistentDomain(forName: suiteName)
-        XCTAssertEqual(ModelManager(mode: .live, defaults: defaults, modelsDirectory: directory).selectedBackend, TranscriptionBackend.preferredDefault)
+    func testCachedLegacyDefaultsSurviveUpgradeAndCleanup() throws {
+        for (model, fileName) in [(WhisperModel.small, "ggml-small.en-q5_1.bin"),
+                                  (.base, "ggml-base.en.bin"), (.base, WhisperModel.base.fileName)] {
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let suiteName = "com.openwhisper.legacy-default.\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suiteName)!
+            defer { defaults.removePersistentDomain(forName: suiteName) }
+            defaults.set(WhisperLanguage.spanish.rawValue, forKey: "selectedLanguage")
+            let legacyFile = directory.appendingPathComponent(fileName)
+            try Data().write(to: legacyFile)
+            let backend: TranscriptionBackend = model == .small ? .whisperSmall : .whisperBase
+            let manager = ModelManager(mode: .live, defaults: defaults, modelsDirectory: directory)
+            XCTAssertEqual(manager.selectedBackend, backend)
+            XCTAssertEqual(manager.selectedModel, model)
+            XCTAssertEqual(manager.selectedLanguage, .spanish)
+            XCTAssertEqual(defaults.string(forKey: "selectedBackend"), backend.rawValue)
+            try? FileManager.default.removeItem(at: legacyFile)
+            XCTAssertEqual(ModelManager(mode: .live, defaults: defaults, modelsDirectory: directory).selectedBackend, backend)
+            defaults.removePersistentDomain(forName: suiteName)
+            XCTAssertEqual(ModelManager(mode: .live, defaults: defaults, modelsDirectory: directory).selectedBackend, TranscriptionBackend.preferredDefault)
+        }
     }
 
     @MainActor

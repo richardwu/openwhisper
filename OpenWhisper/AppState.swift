@@ -181,7 +181,7 @@ final class AppState {
     }
 
     private func recordingFailed(_ error: Error) {
-        guard isRecording else { return }
+        guard isRecording || isTranscribing else { return }
         let backend = recordingSettings?.backend ?? modelManager.selectedBackend
         stopRecording()
         statusMessage = "\(backend.statusName) error: \(error.localizedDescription)"

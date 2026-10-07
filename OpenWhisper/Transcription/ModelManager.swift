@@ -480,17 +480,19 @@ final class ModelManager {
             return .whisperSmall
         }()
 
-        self.selectedModel = WhisperModel(rawValue: storedModel) ?? .small
         let persistedBackend = TranscriptionBackend(rawValue: storedBackend)
-        let migrateLegacyDefault = storedBackend.isEmpty && storedModel.isEmpty &&
-            ["ggml-small.en-q5_1.bin", WhisperModel.small.fileName].contains { fileName in
-                modelsDirectory.map {
-                    FileManager.default.fileExists(atPath: $0.appendingPathComponent(fileName).path)
-                } ?? false
-            }
+        let legacyDefault: WhisperModel? = storedBackend.isEmpty && storedModel.isEmpty
+            ? [WhisperModel.small, .base].first { model in
+                [model.fileName, model == .small ? "ggml-small.en-q5_1.bin" : "ggml-base.en.bin"].contains { fileName in
+                    modelsDirectory.map {
+                        FileManager.default.fileExists(atPath: $0.appendingPathComponent(fileName).path)
+                    } ?? false
+                }
+            } : nil
+        self.selectedModel = WhisperModel(rawValue: storedModel) ?? legacyDefault ?? .small
         let initialSelectedBackend: TranscriptionBackend = {
             guard let persistedBackend else {
-                if migrateLegacyDefault { return .whisperSmall }
+                if let legacyDefault { return Self.backend(for: legacyDefault) }
                 return WhisperModel(rawValue: storedModel).map { Self.backend(for: $0) }
                     ?? initialBackend
             }
@@ -505,7 +507,7 @@ final class ModelManager {
             return persistedBackend
         }()
         self.selectedBackend = initialSelectedBackend
-        if migrateLegacyDefault {
+        if legacyDefault != nil {
             defaults.set(initialSelectedBackend.rawValue, forKey: DefaultsKey.selectedBackend)
         }
         let languagePreference = defaults.string(forKey: "selectedLanguage.\(initialSelectedBackend.rawValue)") ?? storedLanguage

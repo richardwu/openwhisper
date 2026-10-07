@@ -131,6 +131,25 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(state.pasteService.pastedTexts, ["New recording"])
     }
 
+    func testStreamingFailureDuringFinishStopsProcessingImmediately() async {
+        let decoder = StubStreamingTranscriptionService(finalText: "Unused")
+        var resumeFinish: CheckedContinuation<Void, Never>?
+        decoder.onFinish = { await withCheckedContinuation { resumeFinish = $0 } }
+        let state = makeStreamingAppState(decoder: decoder)
+        await state.toggleRecording()
+        let finishing = Task { await state.toggleRecording() }
+        while resumeFinish == nil { await Task.yield() }
+        XCTAssertTrue(state.isTranscribing)
+        decoder.onFailure?(TranscriptionError.stubError)
+        XCTAssertFalse(state.isTranscribing)
+        XCTAssertEqual(state.overlayState.phase, .hidden)
+        XCTAssertTrue(state.statusMessage.contains("error:"))
+        resumeFinish?.resume()
+        await finishing.value
+        XCTAssertTrue(state.pasteService.pastedTexts.isEmpty)
+        XCTAssertTrue(state.historyStore.entries.isEmpty)
+    }
+
     func testStreamingStartupFailureStopsRecordingImmediately() async {
         let decoder = StubStreamingTranscriptionService(finalText: "Unused")
         decoder.beginFailure = TranscriptionError.stubError
