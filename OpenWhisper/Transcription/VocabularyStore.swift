@@ -246,7 +246,7 @@ final class VocabularyStore {
         var index = 0
         while index < tokens.count {
             var best: (end: Int, term: String, score: Double)?
-            let maxLength = min(3, tokens.count - index)
+            let maxLength = min(4, tokens.count - index)
 
             // Prefer the longest phrase. For equal lengths, choose the
             // closest spelling. This mirrors Handy's bounded n-gram matcher.
@@ -258,6 +258,7 @@ final class VocabularyStore {
                 guard !phraseKey.isEmpty else { continue }
 
                 for candidate in candidates {
+                    guard length <= 3 || candidate.term.split(whereSeparator: { $0.isWhitespace }).count >= length else { continue }
                     let score = correctionScore(
                         phrase: phrase,
                         phraseKey: phraseKey,

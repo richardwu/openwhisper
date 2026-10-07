@@ -100,6 +100,20 @@ final class ModelCatalogTests: XCTestCase {
         XCTAssertNil(manager.errorMessage)
     }
 
+    func testModelInstallationPreservesExistingFileOnStagingFailure() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let destination = directory.appendingPathComponent("model.bin")
+        let source = directory.appendingPathComponent("download.bin")
+        try Data("old".utf8).write(to: destination)
+        XCTAssertThrowsError(try ModelManager.installModel(at: source, to: destination))
+        XCTAssertEqual(try Data(contentsOf: destination), Data("old".utf8))
+        try Data("new".utf8).write(to: source)
+        try ModelManager.installModel(at: source, to: destination)
+        XCTAssertEqual(try Data(contentsOf: destination), Data("new".utf8))
+    }
+
     func testModelDownloadsArePinnedAndChecksumsRejectCorruptFiles() throws {
         let urls = WhisperModel.allCases.map(\.downloadURL) + TranscribeCppModel.allCases.map(\.downloadURL)
         XCTAssertTrue(urls.allSatisfy { !$0.path.contains("/resolve/main/") })

@@ -106,6 +106,9 @@ final class VocabularyStoreTests: XCTestCase {
     }
 
     func testLearnedCustomTermIsUsedByCorrectionPass() {
+        XCTAssertTrue(store.learn(term: "North Shore Research Group"))
+        XCTAssertEqual(store.correctTranscription("north shore research group"), "North Shore Research Group")
+        XCTAssertEqual(store.correctTranscription("new york stock exchange"), "New York Stock Exchange")
         XCTAssertTrue(store.learn(term: "AcmeDB"))
         XCTAssertEqual(store.correctTranscription("connect to acmedb"), "connect to AcmeDB")
         XCTAssertTrue(store.learn(term: "Acme Database"))

@@ -70,7 +70,8 @@ final class AppState {
         }
 
         audioRecorder.onAudioFrames = { [weak self] frames in
-            guard let self, self.isRecording else { return }
+            guard let self, self.isRecording,
+                  self.recordingSettings?.backend.isStreamingBackend == true else { return }
             self.streamingTranscriptionService?.append(audioFrames: frames)
         }
         streamingTranscriptionService?.onPartialText = { [weak self] text in
@@ -267,7 +268,6 @@ final class AppState {
             return
         }
         isRecording = false
-        syncCancelRecordingHotkey()
         isTranscribing = true
         syncCancelRecordingHotkey()
         statusMessage = "Processing..."

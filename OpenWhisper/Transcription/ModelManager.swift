@@ -683,10 +683,7 @@ final class ModelManager {
             try Task.checkCancellation()
             guard self.downloadGeneration == generation else { return }
 
-            if FileManager.default.fileExists(atPath: destinationURL.path) {
-                try FileManager.default.removeItem(at: destinationURL)
-            }
-            try FileManager.default.moveItem(at: tempURL, to: destinationURL)
+            try Self.installModel(at: tempURL, to: destinationURL)
 
             guard self.downloadGeneration == generation else { return }
             isDownloading = false
@@ -699,6 +696,18 @@ final class ModelManager {
             guard self.downloadGeneration == generation else { return }
             isDownloading = false
             errorMessage = "Download failed: \(error.localizedDescription)"
+        }
+    }
+
+    nonisolated static func installModel(at source: URL, to destination: URL) throws {
+        // Stage on the destination volume before replacing an existing model.
+        let staged = destination.deletingLastPathComponent().appendingPathComponent(".model-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: staged) }
+        try FileManager.default.moveItem(at: source, to: staged)
+        if FileManager.default.fileExists(atPath: destination.path) {
+            _ = try FileManager.default.replaceItemAt(destination, withItemAt: staged)
+        } else {
+            try FileManager.default.moveItem(at: staged, to: destination)
         }
     }
 
