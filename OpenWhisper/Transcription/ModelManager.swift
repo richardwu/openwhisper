@@ -683,7 +683,14 @@ final class ModelManager {
             try Task.checkCancellation()
             guard self.downloadGeneration == generation else { return }
 
-            try Self.installModel(at: tempURL, to: destinationURL)
+            let installation = Task.detached(priority: .utility) {
+                try Self.installModel(at: tempURL, to: destinationURL)
+            }
+            try await withTaskCancellationHandler {
+                try await installation.value
+            } onCancel: {
+                installation.cancel()
+            }
 
             guard self.downloadGeneration == generation else { return }
             isDownloading = false
@@ -700,10 +707,12 @@ final class ModelManager {
     }
 
     nonisolated static func installModel(at source: URL, to destination: URL) throws {
+        try Task.checkCancellation()
         // Stage on the destination volume before replacing an existing model.
         let staged = destination.deletingLastPathComponent().appendingPathComponent(".model-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: staged) }
         try FileManager.default.moveItem(at: source, to: staged)
+        try Task.checkCancellation()
         if FileManager.default.fileExists(atPath: destination.path) {
             _ = try FileManager.default.replaceItemAt(destination, withItemAt: staged)
         } else {

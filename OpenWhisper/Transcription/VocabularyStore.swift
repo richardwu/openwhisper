@@ -258,7 +258,7 @@ final class VocabularyStore {
                 guard !phraseKey.isEmpty else { continue }
 
                 for candidate in candidates {
-                    guard length <= 3 || candidate.term.split(whereSeparator: { $0.isWhitespace }).count >= length else { continue }
+                    guard length <= 3 || candidate.wordCount >= length else { continue }
                     let score = correctionScore(
                         phrase: phrase,
                         phraseKey: phraseKey,
@@ -328,6 +328,7 @@ final class VocabularyStore {
     private struct CorrectionVocabularyTerm: Sendable {
         let term: String
         let key: String
+        let wordCount: Int
         let learned: Bool
         let hasTechnicalSpelling: Bool
     }
@@ -348,6 +349,8 @@ final class VocabularyStore {
             // periods in abbreviations such as e.g., i.e., and etc.
             guard !term.hasSuffix(".") else { return nil }
             let key = Self.correctionKey(term)
+            let wordCount = term.split(whereSeparator: { $0.isWhitespace }).count
+            guard wordCount <= 4 else { return nil }
             guard !key.isEmpty, seen.insert(Self.comparisonKey(term)).inserted else { return nil }
             let learned = learnedKeys.contains(Self.comparisonKey(term))
             guard learned || !Self.ambiguousBundledKeys.contains(key) else { return nil }
@@ -360,6 +363,7 @@ final class VocabularyStore {
             return CorrectionVocabularyTerm(
                 term: term,
                 key: key,
+                wordCount: wordCount,
                 learned: learned,
                 hasTechnicalSpelling: hasTechnicalSpelling
             )
