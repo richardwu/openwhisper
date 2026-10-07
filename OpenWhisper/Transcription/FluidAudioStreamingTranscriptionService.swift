@@ -55,6 +55,7 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
                 try Task.checkCancellation()
                 continue
             }
+            let currentGeneration = generation
             let task = Task {
                 defer { preparationTask = nil }
                 try await manager.loadModels(
@@ -63,7 +64,9 @@ final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionServi
                     progressHandler: { progress in
                         let fraction = progress.fractionCompleted
                         Task { @MainActor [weak self] in
-                            self?.onPreparationProgress?(fraction)
+                            guard let self, self.generation == currentGeneration,
+                                  self.preparationTask != nil else { return }
+                            self.onPreparationProgress?(fraction)
                         }
                     }
                 )

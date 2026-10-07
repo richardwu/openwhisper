@@ -175,6 +175,7 @@ final class AudioRecorder {
     // MARK: - Live Implementation
 
     private func startLiveRecording(retainSamples: Bool) throws {
+        guard engine == nil else { return }
         recentLevels = Array(repeating: 0, count: 30)
 
         let engine = AVAudioEngine()

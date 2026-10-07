@@ -340,7 +340,6 @@ final class ModelManager {
                    let language = WhisperLanguage(rawValue: saved) {
                     normalizeLanguage(language)
                 }
-                onBackendChange?()
             }
             defaults.set(selectedBackend.rawValue, forKey: DefaultsKey.selectedBackend)
             // Reset only languages that the selected checkpoint cannot accept.
@@ -352,6 +351,7 @@ final class ModelManager {
                 normalizeLanguage(.english)
             }
             validateAppleLanguage()
+            if selectedBackend != oldValue { onBackendChange?() }
         }
     }
 
@@ -582,6 +582,7 @@ final class ModelManager {
         }
         guard case .live = mode else { return }
         guard backend != .appleStreaming || Self.appleStreamingIsAvailable else { return }
+        guard backend != selectedBackend || !isDownloading else { return }
         cancelDownload()
         selectedBackend = backend
         if let whisperModel = backend.whisperModel {
@@ -600,6 +601,7 @@ final class ModelManager {
     func startDownload() {
         guard case .live = mode else { return }
         guard selectedBackend.requiresModel else { return }
+        guard !isDownloading else { return }
         cancelDownload()
         downloadTask = Task {
             await downloadModel()
