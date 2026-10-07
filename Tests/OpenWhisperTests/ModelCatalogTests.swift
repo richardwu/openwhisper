@@ -396,6 +396,8 @@ final class ModelCatalogTests: XCTestCase {
 @MainActor
 private final class RecordingStreamingService: StreamingTranscriptionService {
     var onPartialText: ((String) -> Void)?
+    var onStatusChange: ((String) -> Void)?
+    var onFailure: ((Error) -> Void)?
     let result: String
     var beginCount = 0
 

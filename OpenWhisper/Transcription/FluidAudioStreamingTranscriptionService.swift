@@ -10,6 +10,7 @@ import SwiftWhisper
 /// on-device actor and returns its partial/final text.
 @MainActor
 final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionService {
+    var onStatusChange: ((String) -> Void)?
     var onPartialText: ((String) -> Void)?
     var onFailure: ((Error) -> Void)?
     var onPreparationProgress: (@MainActor (Double) -> Void)?

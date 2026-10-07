@@ -17,8 +17,6 @@ protocol StreamingTranscriptionService: AnyObject {
 }
 
 extension StreamingTranscriptionService {
-    var onStatusChange: ((String) -> Void)? { get { nil } set {} }
-    var onFailure: ((Error) -> Void)? { get { nil } set {} }
     func configure(language: WhisperLanguage, modelURL: URL?) {
         configure(language: language)
     }
