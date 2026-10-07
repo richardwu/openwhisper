@@ -270,6 +270,10 @@ enum TranscriptionBackend: String, CaseIterable {
     /// BCP-47 locales advertised by Nemotron 3.5 ASR Streaming.
     /// A nil value means the backend uses the full Whisper language picker.
     var supportedLanguageOptions: [WhisperLanguage]? {
+        if self == .voxtralMiniRealtime {
+            return [.auto, .english, .arabic, .german, .spanish, .french, .hindi,
+                    .italian, .dutch, .portuguese, .chinese, .japanese, .korean, .russian]
+        }
         guard self == .nemotron35Streaming else { return nil }
         return [
             .auto, .english, .chinese, .german, .spanish, .russian, .korean,

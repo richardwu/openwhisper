@@ -22,6 +22,7 @@ vocabulary correction before paste/history. This covers future selector addition
 1,000 previews, vocabulary snapshots, equivalent results, UI responsiveness, and
 stale C++ worker completion. These checks use decoder spies, not every model's weights.
 
+Use the Debug configuration for these tests. Release builds ignore `OPENWHISPER_*` test overrides and use production defaults and hotkeys.
 The test host requires both `OPENWHISPER_TEST_MODE=1` and `OPENWHISPER_HEADLESS_TESTS=1` to suppress presentation.
 The background script sets both flags and tests that no windows or recording panels become visible.
 Normal app launches retain their windows and menu bar item.

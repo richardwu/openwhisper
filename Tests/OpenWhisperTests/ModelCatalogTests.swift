@@ -352,6 +352,8 @@ final class ModelCatalogTests: XCTestCase {
         XCTAssertFalse(TranscriptionBackend.nemotron35Streaming.isEnglishOnly)
         XCTAssertTrue(TranscriptionBackend.voxtralMiniRealtime.isStreamingBackend)
         XCTAssertFalse(TranscriptionBackend.voxtralMiniRealtime.isEnglishOnly)
+        XCTAssertFalse(TranscriptionBackend.voxtralMiniRealtime.supportedLanguageOptions!.contains(.swahili))
+        XCTAssertTrue(TranscriptionBackend.voxtralMiniRealtime.supportedLanguageOptions!.contains(.auto))
         XCTAssertTrue(TranscriptionBackend.multitalkerParakeetStreaming.isEnglishOnly)
         XCTAssertEqual(
             TranscriptionBackend.nemotron35Streaming.supportedLanguageOptions,

@@ -62,7 +62,9 @@ The model is English-only. The transcribe.cpp streaming services feed the same
 16 kHz buffers to each native stream extension. The picker marks Moonshine,
 Nemotron Speech Streaming EN, and Multitalker Parakeet as English-only.
 Nemotron 3.5 receives the selected BCP-47 locale. Voxtral Realtime accepts auto
-detection or an explicit language hint. OpenWhisper applies local vocabulary
+detection or an explicit language hint from its
+[13 supported languages](https://huggingface.co/mistralai/Voxtral-Mini-4B-Realtime-2602).
+OpenWhisper applies local vocabulary
 correction to live updates, then runs the final text through the shared filter
 once.
 
