@@ -1,0 +1,293 @@
+import AVFoundation
+import FluidAudio
+import Foundation
+import SwiftWhisper
+
+/// A local Parakeet Unified streaming service backed by FluidAudio/Core ML.
+///
+/// Parakeet Unified is English-only. FluidAudio performs model downloads and
+/// Core ML loading locally; the service only sends microphone buffers to the
+/// on-device actor and returns its partial/final text.
+@MainActor
+final class FluidAudioStreamingTranscriptionService: StreamingTranscriptionService {
+    var onStatusChange: ((String) -> Void)?
+    var onPartialText: ((String) -> Void)?
+    var onFailure: ((Error) -> Void)?
+    var onPreparationProgress: (@MainActor (Double) -> Void)?
+
+    private let manager: StreamingUnifiedAsrManager
+    private var preparationTask: Task<Void, Error>?
+    private var startupTask: Task<Void, Error>?
+    private var processingTask: Task<Void, Never>?
+    private var cleanupTask: Task<Void, Never>?
+    private var finishingTask: Task<(String, Bool), Error>?
+    private var pendingFrames: [[Float]] = []
+    private var lastPartial = ""
+    private var modelsLoaded = false
+    private var releaseWhenIdle = false
+    private var isStarting = false
+    private var acceptingFrames = false
+    private var isFinishing = false
+    private var didFail = false
+    private var generation = 0
+
+    init() {
+        self.manager = StreamingUnifiedAsrManager()
+    }
+
+    /// Downloads and loads the FluidAudio model set. Calling this before a
+    /// recording lets the model picker report real readiness and avoids doing
+    /// the first Core ML compile after the user starts speaking.
+    func prepare() async throws {
+        try Task.checkCancellation()
+        await cleanupTask?.value
+        try Task.checkCancellation()
+        while !modelsLoaded {
+            try Task.checkCancellation()
+            if let preparationTask {
+                do {
+                    try await preparationTask.value
+                } catch is CancellationError {
+                    // The owner cancelled. A still-active waiter can retry.
+                    try Task.checkCancellation()
+                    continue
+                }
+                try Task.checkCancellation()
+                continue
+            }
+            let currentGeneration = generation
+            let task = Task {
+                defer { preparationTask = nil }
+                try await manager.loadModels(
+                    to: nil,
+                    configuration: nil,
+                    progressHandler: { progress in
+                        let fraction = progress.fractionCompleted
+                        Task { @MainActor [weak self] in
+                            guard let self, self.generation == currentGeneration,
+                                  self.preparationTask != nil else { return }
+                            self.onPreparationProgress?(fraction)
+                        }
+                    }
+                )
+                // Retain a completed load even if its caller was cancelled.
+                modelsLoaded = true
+            }
+            preparationTask = task
+            try await withTaskCancellationHandler {
+                try await task.value
+                try Task.checkCancellation()
+            } onCancel: {
+                task.cancel()
+            }
+        }
+    }
+
+    /// Keep an active decoder pinned, then release deselected Core ML weights.
+    func setSelected(_ selected: Bool) {
+        releaseWhenIdle = !selected
+        guard !selected, !acceptingFrames, !isStarting, !isFinishing else { return }
+        preparationTask?.cancel()
+        cancel()
+    }
+
+    func configure(language: WhisperLanguage) {
+        // The selected Parakeet Unified checkpoint is English-only. Keep the
+        // protocol's language parameter for parity with Apple's service, but
+        // do not pass unsupported language identifiers into FluidAudio.
+    }
+
+    func configure(language: WhisperLanguage, modelURL: URL?) {
+        configure(language: language)
+    }
+
+    func begin() {
+        cancel()
+        generation &+= 1
+        let currentGeneration = generation
+        pendingFrames.removeAll(keepingCapacity: true)
+        didFail = false
+        isStarting = true
+        acceptingFrames = true
+        lastPartial = ""
+        let cleanup = cleanupTask
+
+        startupTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                try Task.checkCancellation()
+                await cleanup?.value
+                try Task.checkCancellation()
+                if !modelsLoaded {
+                    try await prepare()
+                }
+                guard currentGeneration == generation else { return }
+                isStarting = false
+                startProcessingIfNeeded()
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                guard currentGeneration == generation else { return }
+                didFail = true
+                onFailure?(error)
+                throw error
+            }
+        }
+    }
+
+    func append(audioFrames: [Float]) {
+        guard acceptingFrames, !audioFrames.isEmpty, !didFail else { return }
+        pendingFrames.append(audioFrames)
+        startProcessingIfNeeded()
+    }
+
+    func finish() async throws -> String {
+        acceptingFrames = false
+        let currentGeneration = generation
+        isFinishing = true
+        defer {
+            if currentGeneration == generation { isFinishing = false }
+        }
+        do {
+            try await startupTask?.value
+            guard currentGeneration == generation else { throw CancellationError() }
+            await processingTask?.value
+            guard currentGeneration == generation else { throw CancellationError() }
+
+            guard !didFail else {
+                throw NSError(
+                    domain: "OpenWhisper.FluidAudio",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "Parakeet Unified is unavailable"]
+                )
+            }
+
+            // AppState runs the completed text through TranscriptionService's
+            // shared filtering and correction path. Keep this return value raw so
+            // the local vocabulary is applied exactly once before paste/history.
+            let manager = self.manager
+            let task = Task {
+                try Task.checkCancellation()
+                let text = try await manager.finish()
+                _ = await manager.consumeTokenTimings()
+                // Preserve completed speech, but retry failed cleanup before restart.
+                do {
+                    try await manager.reset()
+                    return (text, true)
+                } catch {
+                    return (text, false)
+                }
+            }
+            finishingTask = task
+            let (text, wasReset) = try await task.value
+            guard currentGeneration == generation else { throw CancellationError() }
+            finishingTask = nil
+            if wasReset { startupTask = nil }
+            if releaseWhenIdle { cancel() }
+            lastPartial = ""
+            return text
+        } catch {
+            if currentGeneration == generation { cancel() }
+            throw error
+        }
+    }
+
+    func cancel() {
+        generation &+= 1
+        let previousPreparation = preparationTask
+        let previousStartup = startupTask
+        let previousProcessing = processingTask
+        let previousCleanup = cleanupTask
+        let previousFinish = finishingTask
+        finishingTask?.cancel()
+        finishingTask = nil
+        startupTask?.cancel()
+        startupTask = nil
+        processingTask?.cancel()
+        processingTask = nil
+        pendingFrames.removeAll(keepingCapacity: false)
+        lastPartial = ""
+        didFail = false
+        isStarting = false
+        acceptingFrames = false
+        isFinishing = false
+
+        let manager = self.manager
+        cleanupTask = Task {
+            await previousCleanup?.value
+            _ = try? await previousStartup?.value
+            await previousProcessing?.value
+            _ = try? await previousFinish?.value
+            // startupTask remains set throughout a dirty session. Only a
+            // successful finish clears it after reset; repeated cancels await
+            // previousCleanup, so they cannot skip an outstanding reset.
+            if previousStartup != nil || previousProcessing != nil || previousFinish != nil {
+                try? await manager.reset()
+            }
+            if releaseWhenIdle {
+                _ = try? await previousPreparation?.value
+                await manager.cleanup()
+                modelsLoaded = false
+            }
+        }
+    }
+
+    private func startProcessingIfNeeded() {
+        guard modelsLoaded, !isStarting, !didFail, processingTask == nil, !pendingFrames.isEmpty else { return }
+        let currentGeneration = generation
+        processingTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                if currentGeneration == generation { processingTask = nil }
+            }
+
+            do {
+                while currentGeneration == generation, !pendingFrames.isEmpty {
+                    try Task.checkCancellation()
+                    // Drain a backlog in one buffer instead of shifting a
+                    // growing queue once for every microphone callback.
+                    let frames = pendingFrames.flatMap { $0 }
+                    pendingFrames.removeAll(keepingCapacity: true)
+                    guard let buffer = makeAudioBuffer(frames) else { throw AudioRecorderError.bufferAllocationFailed }
+                    try await manager.appendAudio(buffer)
+                    try await manager.processBufferedAudio()
+                    _ = await manager.consumeTokenTimings()
+                    let partial = await manager.getPartialTranscript()
+                    guard currentGeneration == generation else { return }
+                    guard !partial.isEmpty, partial != lastPartial else { continue }
+                    lastPartial = partial
+                    onPartialText?(partial)
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                if currentGeneration == generation {
+                    didFail = true
+                    onFailure?(error)
+                }
+            }
+        }
+    }
+
+    private func makeAudioBuffer(_ frames: [Float]) -> AVAudioPCMBuffer? {
+        guard let format = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: 16_000,
+            channels: 1,
+            interleaved: false
+        ),
+        let buffer = AVAudioPCMBuffer(
+            pcmFormat: format,
+            frameCapacity: AVAudioFrameCount(frames.count)
+        ) else {
+            return nil
+        }
+
+        buffer.frameLength = AVAudioFrameCount(frames.count)
+        guard let destination = buffer.floatChannelData?[0] else { return nil }
+        frames.withUnsafeBufferPointer { source in
+            destination.update(from: source.baseAddress!, count: frames.count)
+        }
+        return buffer
+    }
+}

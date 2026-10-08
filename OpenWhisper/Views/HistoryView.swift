@@ -14,6 +14,7 @@ struct HistoryView: View {
                 systemImage: "clock",
                 description: Text("Your transcription history will appear here.")
             )
+            .accessibilityIdentifier("history.empty")
         } else {
             VStack(spacing: 0) {
                 HStack {
@@ -29,6 +30,7 @@ struct HistoryView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .font(.caption)
+                    .accessibilityIdentifier("history.deleteAll")
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -40,6 +42,7 @@ struct HistoryView: View {
                                 .font(.body)
                                 .lineLimit(4)
                                 .textSelection(.enabled)
+                                .accessibilityIdentifier("history.entry.\(entry.id)")
 
                             HStack {
                                 Text(relativeTime(from: entry.date))
@@ -62,6 +65,8 @@ struct HistoryView: View {
                                 }
                                 .buttonStyle(.borderless)
                                 .help("Copy to clipboard")
+                                .accessibilityLabel("Copy transcription")
+                                .accessibilityIdentifier("history.copy.\(entry.id)")
 
                                 Button {
                                     entryToDelete = entry
@@ -72,6 +77,8 @@ struct HistoryView: View {
                                 }
                                 .buttonStyle(.borderless)
                                 .help("Delete")
+                                .accessibilityLabel("Delete transcription")
+                                .accessibilityIdentifier("history.delete.\(entry.id)")
                             }
                         }
                         .padding(.vertical, 4)

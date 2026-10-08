@@ -97,6 +97,23 @@ final class RealTranscriptionTests: XCTestCase {
 
     // MARK: - Tests
 
+    func testCancelAndRestartUsesFreshBatchSession() async throws {
+        let samples = try loadAudioSamples(named: "english-e2e-test-1", ext: "m4a")
+        let longSamples = Array(repeating: samples, count: 10).flatMap { $0 }
+        let decoding = Task { try await service.transcribe(audioFrames: longSamples, modelURL: modelURL) }
+        try await Task.sleep(for: .milliseconds(20))
+        service.cancel()
+        do {
+            _ = try await decoding.value
+            XCTFail("Canceled batch transcription must not return text")
+        } catch {
+            XCTAssertTrue(String(describing: error).lowercased().contains("cancel"))
+        }
+        let text = try await service.transcribe(audioFrames: samples, modelURL: modelURL)
+        XCTAssertFalse(text.isEmpty)
+        XCTAssertLessThan(text.count, 300, "Restart must not reuse canceled audio")
+    }
+
     func testSilenceProducesEmptyOutput() async throws {
         let samples = try loadWAVSamples(named: "silence")
         let text = try await service.transcribe(audioFrames: samples, modelURL: modelURL)
@@ -161,6 +178,7 @@ final class RealTranscriptionTests: XCTestCase {
         let defaults = UserDefaults(suiteName: "com.openwhisper.test.\(UUID().uuidString)")!
         let env = AppEnvironment(
             audioRecorder: AudioRecorder(mode: .fixture(samples: Array(repeating: 0.1, count: 16000))),
+            streamingTranscriptionService: nil,
             transcriptionService: TranscriptionService(mode: .stub(result: text)),
             pasteService: PasteService(mode: .spy),
             modelManager: ModelManager(mode: .ready, defaults: defaults),

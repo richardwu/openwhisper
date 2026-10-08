@@ -12,6 +12,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # SpeechAnalyzer needs the macOS 26 SDK; allow installed 26.x updates.
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26'
+
       - name: Install xcodegen
         run: brew install xcodegen
 
@@ -52,10 +57,16 @@ jobs:
           retention-days: 1
 
   ui-e2e:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: macos-15
     needs: build-and-unit
     steps:
       - uses: actions/checkout@v4
+
+      # SpeechAnalyzer needs the macOS 26 SDK; allow installed 26.x updates.
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26'
 
       - name: Install xcodegen
         run: brew install xcodegen
@@ -96,6 +107,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # SpeechAnalyzer needs the macOS 26 SDK; allow installed 26.x updates.
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26'
+
       - name: Install xcodegen
         run: brew install xcodegen
 
@@ -103,15 +119,17 @@ jobs:
         id: cache-model
         uses: actions/cache@v4
         with:
-          path: .build/models/ggml-base.bin
-          key: whisper-model-base-v1
+          path: .build/models/ggml-small-q5_1.bin
+          key: whisper-model-small-q5_1-ae85e4a935d7a567
 
       - name: Download Whisper model
-        if: steps.cache-model.outputs.cache-hit != 'true'
         run: |
           mkdir -p .build/models
-          curl -L -o .build/models/ggml-base.bin \
-            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
+          if [ ! -f .build/models/ggml-small-q5_1.bin ]; then
+            curl --fail --location -o .build/models/ggml-small-q5_1.bin \
+              "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-small-q5_1.bin"
+          fi
+          echo "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb  .build/models/ggml-small-q5_1.bin" | shasum -a 256 -c -
 
       - name: Generate Xcode project
         run: xcodegen generate
@@ -128,7 +146,7 @@ jobs:
 
       - name: Run real transcription tests
         env:
-          OPENWHISPER_MODEL_PATH: ${{ github.workspace }}/.build/models/ggml-base.bin
+          TEST_RUNNER_OPENWHISPER_MODEL_PATH: ${{ github.workspace }}/.build/models/ggml-small-q5_1.bin
         run: |
           xcodebuild test \
             -scheme OpenWhisper \

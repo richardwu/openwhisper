@@ -26,6 +26,28 @@ final class TranscriptionFilterTests: XCTestCase {
         XCTAssertEqual(result, "Hello")
     }
 
+    func testRemovesRecognizedSoundDescriptions() {
+        XCTAssertEqual(service.filterTranscription("[door slams] Hello (coughs)"), "Hello")
+        XCTAssertEqual(service.filterTranscription("[coughing] (door slamming)"), "")
+        XCTAssertEqual(service.filterTranscription("[typing] (upbeat music) (wind blowing) [clapping]"), "")
+    }
+
+    func testRemovesWhisperSoundAndSpeechTags() {
+        for tag in ["[SOUND]", "(laughs)", "[laughs]", "(sighing)", "(speaks in foreign language)", "[MUSIC PLAYING]", "[Pause]", "[crosstalk]", "[ Cheering ]", "(phone ringing)", "(crowd cheering)", "[Speaker 1]"] {
+            XCTAssertEqual(service.filterTranscription(tag), "", tag)
+        }
+    }
+
+    func testRemovesWaterNoiseTag() {
+        XCTAssertEqual(service.filterTranscription("(water rushing)"), "")
+        XCTAssertEqual(service.filterTranscription("(water running)"), "")
+        XCTAssertEqual(service.filterTranscription("[WATER RUSHING]"), "")
+    }
+
+    func testPreservesDictatedBracketsAndParentheses() {
+        XCTAssertEqual(service.filterTranscription("Keep [TODO] (see attached)."), "Keep [TODO] (see attached).")
+    }
+
     func testRemovesMusicalNotes() {
         let result = service.filterTranscription("♪♪♪ Hello ♪")
         XCTAssertEqual(result, "Hello")
@@ -45,6 +67,29 @@ final class TranscriptionFilterTests: XCTestCase {
     func testPreservesRealContent() {
         let result = service.filterTranscription("This is a real transcription.")
         XCTAssertEqual(result, "This is a real transcription.")
+    }
+
+    func testAppliesLocalVocabularyCorrectionAfterFiltering() {
+        let result = service.filterTranscription("I trade on Nyzi, then use nasdaq.")
+        XCTAssertEqual(result, "I trade on NYSE, then use NASDAQ.")
+    }
+
+    func testTranscribeFixtureUsesTheSameFinalCorrectionPath() async throws {
+        let suiteName = "com.openwhisper.transcription-filter.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = VocabularyStore(defaults: defaults)
+        let fixtureService = TranscriptionService(
+            mode: .stub(result: "I trade on Nyzi."),
+            vocabularyStore: store
+        )
+        let result = try await fixtureService.transcribe(
+            audioFrames: [0],
+            modelURL: URL(fileURLWithPath: "/tmp/test-model.bin")
+        )
+
+        XCTAssertEqual(result, "I trade on NYSE.")
     }
 
     func testPunctuationOnlyReturnEmpty() {
