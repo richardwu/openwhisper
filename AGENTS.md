@@ -2,6 +2,13 @@
 
 Read [CLAUDE.md](CLAUDE.md) for build, signing, and repository conventions.
 
+## README screenshots
+
+- Capture the signed production app, named `OpenWhisper`. Do not use the Debug app named `OpenWhisper (Dev)` or edit a screenshot to remove its name.
+- Use real production views and check visible text for private data before publishing. Do not present fixture model readiness or permission indicators as production state.
+- Save captures under `.context/`, then add the selected images to `docs/images/`.
+- Use commit-pinned image URLs in README.md. Present History, Vocabulary, and Settings in one row with a caption that explains the features.
+
 ## Streaming transcription
 
 - Keep audio and transcription on the user's Mac.
