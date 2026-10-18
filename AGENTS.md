@@ -2,6 +2,10 @@
 
 Read [CLAUDE.md](CLAUDE.md) for build, signing, and repository conventions.
 
+## Hard Rules
+
+- Never expose secrets through tool output, console or print output, local logs, or remote log servers, whether or not an LLM receives the output. Never run commands or add code that prints, dumps, or logs the contents of `.env`-like files or any file that may contain secrets. This includes environment dumps, credentials, tokens, private keys, and command traces. Use checks that return only names, presence, or status. If inspection is necessary, redact sensitive values before output leaves the process; never rely on redacting them after output is emitted or a tool returns.
+
 ## README screenshots
 
 - Capture the signed production app, named `OpenWhisper`. Do not use the Debug app named `OpenWhisper (Dev)` or edit a screenshot to remove its name.
